@@ -14,10 +14,16 @@ RUN --mount=type=cache,id=npm_cache,target=/root/.npm npm install -g @deepseek-a
 
 # Bypass the web client's loopback gate: dsh treats a non-loopback page authority
 # (e.g. dsh.example.com) as "remote", which leaves the settings page in memory-only
-# mode. Force isLoopbackHostname to always answer true so settings work over the LAN.
-RUN f="$(npm root -g)/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-client-connection/lib/client.js" \
+# mode. Force isLoopbackHostname to always answer true so settings work over the
+# LAN, and drop the desktop-only "open configuration file" action (xdg-open is
+# absent in the container, so it only ever errors).
+RUN base="$(npm root -g)/@deepseek-ai/dsh/node_modules/@deepseek-ai" \
+ && f="$base/dsh-client-connection/lib/client.js" \
  && sed -i 's/if (hostname === "localhost" || hostname === "\[::1\]")//' "$f" \
- && ! grep -Fq 'if (hostname === "localhost"' "$f"
+ && ! grep -Fq 'if (hostname === "localhost"' "$f" \
+ && g="$base/dsh-client-ui-settings-general/lib/client.js" \
+ && sed -i 's/const documentController = .*/const documentController = void 0;/' "$g" \
+ && ! grep -Fq 'new SettingsDocumentStore' "$g"
 
 COPY --chmod=755 entrypoint.sh /entrypoint.sh
 
