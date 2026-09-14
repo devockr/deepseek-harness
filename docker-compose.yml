@@ -1,0 +1,19 @@
+services:
+  dsh:
+    build: .
+    container_name: dsh
+    hostname: dsh
+    restart: always
+    environment:
+      - NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
+      - DSH_TRUSTED_HOSTS=${DSH_TRUSTED_HOSTS:-dsh.example.com}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - http_proxy=${http_proxy:-}
+      - https_proxy=${https_proxy:-}
+      - all_proxy=${all_proxy:-}
+      - no_proxy=${no_proxy:-}
+    ports:
+      - "15080:3080"
+    volumes:
+      - ./.dsh:/home/app/.dsh
+      - ..:/home/app/Workspaces
