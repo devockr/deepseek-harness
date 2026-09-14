@@ -1,2 +1,5 @@
 .dsh
 .git
+deepseek-harness/.git
+!.git/modules/deepseek-harness
+node_modules

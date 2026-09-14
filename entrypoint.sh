@@ -22,4 +22,4 @@ for h in ${DSH_TRUSTED_HOSTS:-}; do
   set -- "$@" --trusted-host "$h"
 done
 
-exec node --expose-internals "$(command -v dsh)" --profile web --patch /tmp/webserver.yml --no-open "$@"
+exec node --expose-internals /app/apps/cli/lib/bin.js --profile web --patch /tmp/webserver.yml --no-open "$@"

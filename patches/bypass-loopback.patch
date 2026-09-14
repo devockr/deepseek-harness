@@ -1,0 +1,120 @@
+diff --git a/packages/api/gateway/src/client/index.ts b/packages/api/gateway/src/client/index.ts
+index edb58d3d25..d92a6ef2b2 100644
+--- a/packages/api/gateway/src/client/index.ts
++++ b/packages/api/gateway/src/client/index.ts
+@@ -120,6 +120,8 @@ export interface RemoteHostFacts {
+   readonly home: string | undefined
+   /** Whether the carrier connects to the local Host. */
+   readonly isLoopback: boolean
++  /** Non-loopback authorities this deployment serves (from DSH_TRUSTED_HOSTS). */
++  readonly trustedHosts: readonly string[]
+ }
+ 
+ declare module '@deepseek-ai/cordis' {
+@@ -191,9 +193,14 @@ class ClientRemoteService extends Service implements ClientRemote {
+     // Identity-stable: readers (useSyncExternalStore snapshots, memo inputs)
+     // compare by reference, so a fresh object is minted only when the fact
+     // itself changed. isLoopback is fixed for the page lifetime.
+-    const home = this.connection.generation.getSnapshot()?.host.home
++    const generationHost = this.connection.generation.getSnapshot()?.host
++    const home = generationHost?.home
+     if (this.hostFacts === undefined || this.hostFacts.home !== home) {
+-      this.hostFacts = { home, isLoopback: this.connection.isLoopback }
++      this.hostFacts = {
++        home,
++        isLoopback: this.connection.isLoopback,
++        trustedHosts: generationHost?.trustedHosts ?? [],
++      }
+     }
+     return this.hostFacts
+   }
+diff --git a/packages/api/gateway/src/index.ts b/packages/api/gateway/src/index.ts
+index ae813fde1a..719c84efb5 100644
+--- a/packages/api/gateway/src/index.ts
++++ b/packages/api/gateway/src/index.ts
+@@ -250,7 +250,14 @@ export class TypertGatewayService extends Service implements TypertGateway {
+       this.remoteEvents = undefined
+       lifetime.abort(error)
+     })
+-    const registration: RegisteredRemoteEventSource = { lifetime, done, host: { home: host.home } }
++    const registration: RegisteredRemoteEventSource = {
++      lifetime,
++      done,
++      host: {
++        home: host.home,
++        ...(host.trustedHosts === undefined ? {} : { trustedHosts: host.trustedHosts }),
++      },
++    }
+     this.remoteEvents = registration
+     return async () => {
+       if (this.remoteEvents === registration) {
+diff --git a/packages/api/gateway/src/stream-protocol.ts b/packages/api/gateway/src/stream-protocol.ts
+index 142598863e..b1625e333a 100644
+--- a/packages/api/gateway/src/stream-protocol.ts
++++ b/packages/api/gateway/src/stream-protocol.ts
+@@ -27,6 +27,8 @@ export type RemoteEventId = Branded<'RemoteEventId'>
+ export interface RemoteEventHostInfo {
+   /** Host account home used only to abbreviate displayed filesystem paths. */
+   readonly home: string
++  /** Non-loopback authorities this deployment serves (from DSH_TRUSTED_HOSTS). */
++  readonly trustedHosts?: readonly string[]
+ }
+ 
+ /** Opening item that binds later HTTP results to this active event stream. */
+diff --git a/packages/api/remotes/src/index.ts b/packages/api/remotes/src/index.ts
+index c75e55eefd..21bb5180fd 100644
+--- a/packages/api/remotes/src/index.ts
++++ b/packages/api/remotes/src/index.ts
+@@ -38,7 +38,10 @@ export const inject = ['typertGateway']
+ /** Host plugin body registering this application's selected Cordis event source. */
+ export function apply(ctx: Context): void {
+   ctx.effect(
+-    () => ctx.typertGateway.registerRemoteEvents(remoteEventSource(ctx), { home: homedir() }),
++    () => ctx.typertGateway.registerRemoteEvents(remoteEventSource(ctx), {
++      home: homedir(),
++      trustedHosts: (process.env.DSH_TRUSTED_HOSTS ?? '').split(/\s+/).filter(Boolean),
++    }),
+     'api-remotes: forwarded Cordis event source',
+   )
+ }
+diff --git a/packages/client/connection/src/client/connection.ts b/packages/client/connection/src/client/connection.ts
+index 115f8fb7da..b36bfcda23 100644
+--- a/packages/client/connection/src/client/connection.ts
++++ b/packages/client/connection/src/client/connection.ts
+@@ -7,6 +7,8 @@ export type { ConnectionRecoveryConfig } from '../recovery-config.ts'
+ export interface ConnectionHostInfo {
+   /** Host account home used only to abbreviate displayed filesystem paths. */
+   readonly home: string
++  /** Non-loopback authorities this deployment serves (from DSH_TRUSTED_HOSTS). */
++  readonly trustedHosts?: readonly string[]
+ }
+ 
+ /** One successfully established Host generation. */
+diff --git a/packages/client/ui-settings-general/src/client/index.ts b/packages/client/ui-settings-general/src/client/index.ts
+index c8962ec009..0364a651d4 100644
+--- a/packages/client/ui-settings-general/src/client/index.ts
++++ b/packages/client/ui-settings-general/src/client/index.ts
+@@ -73,7 +73,8 @@ export function apply(ctx: ClientContext): void {
+   // locale/change re-registration wiring.
+   const t = ctx.locale.bind(NS)
+   // The shared SettingsScope mirror updates after document commits and reconnects.
+-  const documentController = ctx.remote.$host.isLoopback
++  const { isLoopback, trustedHosts } = ctx.remote.$host
++  const documentController = (isLoopback || trustedHosts.includes(location.hostname))
+     ? new SettingsDocumentStore(ctx, ctx.settingsScope.describe())
+     : undefined
+   const documentInjected = documentController === undefined
+diff --git a/packages/client/ui-settings/src/client/index.ts b/packages/client/ui-settings/src/client/index.ts
+index d595952c3c..40b17272a6 100644
+--- a/packages/client/ui-settings/src/client/index.ts
++++ b/packages/client/ui-settings/src/client/index.ts
+@@ -55,7 +55,8 @@ export function apply(ctx: Context): void {
+   const schema = new SettingsSchemaService(ctx)
+   // Resolved once here, where `remote` is declared in this plugin's own
+   // `inject`; the binder hands the same answer to every scope it binds.
+-  const persistence = ctx.remote.$host.isLoopback ? 'host' : 'memory'
++  const { isLoopback, trustedHosts } = ctx.remote.$host
++  const persistence = (isLoopback || trustedHosts.includes(location.hostname)) ? 'host' : 'memory'
+   const mirror = new SettingsDescribeMirror(ctx, persistence)
+   ctx.effect(() => {
+     const disposers = [
