@@ -56,5 +56,5 @@ Ports and volumes:
 ## Notes
 
 - **Sandbox** — dsh's file sandbox needs user namespaces or Landlock. On hosts without them (e.g. Synology's 4.4 kernel), either set `DSH_PERMISSION_MODE=danger-full-access`, or approve the `danger-full-access` escalation when prompted in the UI.
-- **Settings page is loopback-only** — the Models/settings page only loads from `localhost`. Reach it via an SSH tunnel (`ssh -L 3080:localhost:3080 <host>`) for full functionality.
+- **Settings page** — dsh gates the Models/settings page behind a client-side loopback check. The `Dockerfile` patches that check in the installed bundle, so the page loads over the LAN and settings persist durably (no SSH tunnel needed).
 - **HTTPS reverse proxy** — if you front this with nginx, keep the `Host` header intact (`proxy_set_header Host $http_host;`) so the browser-trust fence passes, and add WebSocket upgrade headers.
