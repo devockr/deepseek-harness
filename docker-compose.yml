@@ -3,9 +3,17 @@ services:
     build: .
     container_name: dsh
     hostname: dsh
-    user: "${UID}:${GID}"
+    # Start as root so entrypoint.sh can re-point the image's `app` account at
+    # PUID/PGID and fix ownership, then drop to that uid (setpriv) before exec'ing
+    # dsh. Nothing about the uid is baked into the image, so it can be built once
+    # and reused by anyone. `docker exec` therefore lands as root — use
+    # `docker exec -u app ...` for a shell as the working user.
+    user: "0:0"
     restart: always
     environment:
+      # Host uid/gid to run dsh as; entrypoint.sh re-points `app` at them.
+      - PUID=${UID}
+      - PGID=${GID}
       - NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
       - DSH_TRUSTED_HOSTS=${DSH_TRUSTED_HOSTS:-dsh.example.com}
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}

@@ -3,13 +3,23 @@
 # so Alpine fails at boot with "No usable native binding found".
 FROM node:24-bookworm-slim
 
-# Create a non-root user for dsh to run as. docker-compose overrides it at
-# runtime via `user: "${UID}:${GID}"` so dsh runs as the host user and files it
-# writes into the bind mounts are owned by the host user, not a container uid.
+# Create the account dsh runs as. Its uid/gid here are placeholders only: the
+# real ones arrive at runtime as PUID/PGID and entrypoint.sh re-points this
+# account at them before dropping privileges (the linuxserver.io convention).
+# This line also supplies the account's home and skeleton files up front.
+# On Alpine: busybox adduser has a different CLI — `apk add shadow` for the real
+# useradd/usermod/groupadd/groupmod, and `util-linux` for setpriv/mountpoint.
 RUN groupadd app && useradd -m -g app -s /bin/bash app
 
 # bash is required by dsh's bash executor (the slim image ships dash, not bash).
-RUN apt-get update && apt-get install -y --no-install-recommends bash \
+# openssh-client provides the actual ssh/scp/sftp/ssh-keygen binaries — and those
+# need the runtime uid to exist in /etc/passwd (see entrypoint.sh).
+# git is what dsh's tools use for repo work; the slim image omits it.
+# util-linux is what entrypoint.sh relies on: setpriv (drop privileges) and
+# mountpoint (never chown a bind mount). Named explicitly so a missing binary
+# fails the build rather than the boot.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      bash git openssh-client util-linux \
  && rm -rf /var/lib/apt/lists/*
 
 # Install the CLI globally (as root, so it can write to the global prefix).
@@ -33,7 +43,12 @@ RUN base="$(npm root -g)/@deepseek-ai/dsh/node_modules/@deepseek-ai" \
 
 COPY --chmod=755 entrypoint.sh /entrypoint.sh
 
-USER app
+# Deliberately no USER here: the container starts as root so entrypoint.sh can
+# re-point `app` to PUID/PGID and fix ownership, then it drops to that uid with
+# setpriv before exec'ing dsh. This is what makes the image reusable by anyone —
+# no uid is baked in.
+#   docker exec ... -> root; use `docker exec -u app ...` for a shell as app.
+# Do not cap_drop ALL: switching uid needs CAP_SETUID/CAP_SETGID.
 
 WORKDIR /app
 

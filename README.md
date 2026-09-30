@@ -9,10 +9,12 @@ Dockerized [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (
 
 ## Getting started
 
-1. Provide the API key (export it, or drop it in a `.env` in this directory):
+1. Provide the API key and host uid/gid (export them, or drop them in a `.env`
+   in this directory):
 
    ```sh
    export DEEPSEEK_API_KEY=sk-...
+   export UID GID
    ```
 
 2. Build and start:
@@ -43,6 +45,7 @@ Environment variables (see `docker-compose.yml`):
 | Variable | Purpose | Default |
 | --- | --- | --- |
 | `DEEPSEEK_API_KEY` | DeepSeek API key — the highest-priority credential source | — |
+| `PUID` / `PGID` | uid/gid dsh runs as (and owns bind-mounted files as); compose forwards the host's `$UID`/`$GID` | `$UID` / `$GID` |
 | `DSH_TRUSTED_HOSTS` | Space-separated host authorities allowed by dsh's browser-trust fence | `dsh.example.com` |
 | `http_proxy` / `https_proxy` / `all_proxy` / `no_proxy` | Outbound proxy for dsh's HTTP requests | — |
 
@@ -55,6 +58,14 @@ Ports and volumes:
 
 ## Notes
 
+- **Runs as your host user** — the container starts as root, re-points its `app`
+  account to `PUID`/`PGID`, fixes ownership of the home skeleton (leaving bind
+  mounts alone), then drops privileges with `setpriv`. Files in the mounts are
+  owned by you, not a container uid.
+- **One-off commands** — `docker exec` lands as root; use `docker exec -u app …`
+  for a shell as the working user, or `docker exec dsh dsh …` for arbitrary dsh
+  invocations. Extra `docker run <image> <args>` are appended after dsh's web
+  flags, so they can't override `--profile web`.
 - **Sandbox** — dsh's file sandbox needs user namespaces or Landlock. On hosts without them (e.g. Synology's 4.4 kernel), either set `DSH_PERMISSION_MODE=danger-full-access`, or approve the `danger-full-access` escalation when prompted in the UI.
 - **Settings page** — dsh gates the Models/settings page behind a client-side loopback check. The `Dockerfile` patches that check in the installed bundle, so the page loads over the LAN and settings persist durably (no SSH tunnel needed).
 - **HTTPS reverse proxy** — if you front this with nginx, keep the `Host` header intact (`proxy_set_header Host $http_host;`) so the browser-trust fence passes, and add WebSocket upgrade headers.
