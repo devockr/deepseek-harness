@@ -1,10 +1,14 @@
-FROM node:24-alpine
+# glibc base (not Alpine): dsh 0.2.x depends on node-addon-require-builtin, whose
+# prebuilt binaries are published for linux-*-gnu only — there is no musl build,
+# so Alpine fails at boot with "No usable native binding found".
+FROM node:24-bookworm-slim
 
 # Avoid running as root
-RUN addgroup -S app && adduser -S app -G app
+RUN groupadd app && useradd -m -g app -s /bin/bash app
 
-# bash is required by dsh's bash executor (Alpine ships ash, not bash).
-RUN apk add --no-cache bash
+# bash is required by dsh's bash executor (the slim image ships dash, not bash).
+RUN apt-get update && apt-get install -y --no-install-recommends bash \
+ && rm -rf /var/lib/apt/lists/*
 
 # Install the CLI globally (as root, so it can write to the global prefix).
 # The web profile's HMR service requires Node's --expose-internals flag, which
