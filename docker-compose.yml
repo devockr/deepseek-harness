@@ -3,6 +3,7 @@ services:
     build: .
     container_name: dsh
     hostname: dsh
+    user: "${UID}:${GID}"
     restart: always
     environment:
       - NPM_CONFIG_REGISTRY=https://registry.npmmirror.com

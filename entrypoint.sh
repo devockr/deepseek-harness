@@ -2,6 +2,11 @@
 set -e
 
 umask 077
+
+# The `user:` directive in docker-compose runs us as the host user, but does not
+# set HOME; dsh keeps its state in $HOME/.dsh.
+export HOME=/home/app
+
 CRED="$HOME/.dsh/.credentials.yaml"
 [ -f "$CRED" ] && chmod 600 "$CRED"
 

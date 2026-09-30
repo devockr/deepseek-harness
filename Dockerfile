@@ -3,7 +3,9 @@
 # so Alpine fails at boot with "No usable native binding found".
 FROM node:24-bookworm-slim
 
-# Avoid running as root
+# Create a non-root user for dsh to run as. docker-compose overrides it at
+# runtime via `user: "${UID}:${GID}"` so dsh runs as the host user and files it
+# writes into the bind mounts are owned by the host user, not a container uid.
 RUN groupadd app && useradd -m -g app -s /bin/bash app
 
 # bash is required by dsh's bash executor (the slim image ships dash, not bash).
