@@ -1,2 +1,14 @@
-.dsh
-.git
+# Deny by default.
+#
+# The build context needs exactly one file: entrypoint.sh — the only COPY in the
+# Dockerfile (every other step is apt/npm and reads nothing from the tree).
+# Nothing else enters the context, so secrets cannot ride along by accident: .dsh
+# holds .credentials.yaml, .tasks holds the router SSH private key, and .git is
+# 255 MB of history. Listing those here as extra rules would be dead config — the
+# `*` below already excludes them, so they are documented, not re-excluded.
+#
+# When a new COPY is introduced, whitelist it here. Until then the build fails
+# loudly ("failed to compute cache key: ... not found") rather than silently
+# shipping a context you did not intend.
+*
+!entrypoint.sh
