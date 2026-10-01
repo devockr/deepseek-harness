@@ -1,6 +1,6 @@
-# Local dsh state: .credentials.yaml and the git credential broker live here.
+# Local dsh state, written at runtime (see README).
 .dsh
-# Private task notes (router SSH keys, internal addressing).
+# Private notes kept in the working directory.
 .tasks
 
 # The real compose file is the machine-specific copy; the tracked template is
