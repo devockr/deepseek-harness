@@ -3,21 +3,6 @@
   "extends": [
     "github>1stG/configs"
   ],
-  "packageRules": [
-    {
-      "description": "The Node FROM line belongs to the regex manager below: the built-in Dockerfile manager would raise a second update for the same dep, and its replaceString never touches the #vX.Y.Z marker",
-      "matchManagers": [
-        "dockerfile"
-      ],
-      "matchDatasources": [
-        "docker"
-      ],
-      "matchPackageNames": [
-        "node"
-      ],
-      "enabled": false
-    }
-  ],
   "customManagers": [
     {
       "customType": "regex",
@@ -29,20 +14,6 @@
         "npm install -g (?<depName>@?[^\\s@]+)@(?<currentValue>[^\\s]+)"
       ],
       "datasourceTemplate": "npm"
-    },
-    {
-      "customType": "regex",
-      "description": "Keep the #vX.Y.Z Node marker in step with the pinned base image: the marker and the FROM line are matched as one span and rewritten together",
-      "managerFilePatterns": [
-        "/(^|/)Dockerfile$/"
-      ],
-      "matchStrings": [
-        "\\n#v[0-9]+\\.[0-9]+\\.[0-9]+\\nFROM (?<depName>node):(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+-bookworm-slim)@(?<currentDigest>sha256:[a-f0-9]{64})"
-      ],
-      "datasourceTemplate": "docker",
-      "packageNameTemplate": "node",
-      "versioningTemplate": "docker",
-      "autoReplaceStringTemplate": "\n#v{{newVersion}}\nFROM {{packageName}}:{{newValue}}@{{newDigest}}"
     }
   ]
 }
