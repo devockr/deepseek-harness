@@ -17,11 +17,18 @@ Dockerized [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (
    export UID GID
    ```
 
-2. Build and start:
+   `.env` is gitignored, so it is safe to keep in the working directory.
+
+2. Create your compose file from the template and build:
 
    ```sh
+   cp docker-compose.example.yml docker-compose.yml
    docker compose up -d --build
    ```
+
+   `docker-compose.yml` itself is gitignored: it is the copy that carries your
+   own hostnames, LAN addresses and proxy settings, which do not belong in a
+   published repository.
 
 3. Grab the one-time token from the logs:
 
@@ -40,7 +47,7 @@ The token rotates on every restart.
 
 ## Configuration
 
-Environment variables (see `docker-compose.yml`):
+Environment variables (see `docker-compose.example.yml`):
 
 | Variable | Purpose | Default |
 | --- | --- | --- |

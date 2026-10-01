@@ -15,11 +15,17 @@ RUN groupadd app && useradd -m -g app -s /bin/bash app
 # openssh-client provides the actual ssh/scp/sftp/ssh-keygen binaries — and those
 # need the runtime uid to exist in /etc/passwd (see entrypoint.sh).
 # git is what dsh's tools use for repo work; the slim image omits it.
+# ca-certificates supplies /etc/ssl/certs/ca-certificates.crt, the trust store
+# git/curl/node read for TLS. Without it `git clone https://…` dies with
+# "server certificate verification failed … CAfile: none" — and node's own
+# outbound HTTPS works only because it falls back to its bundled roots, so the
+# gap shows up in git first. Not inherited from the base: bookworm-slim ships
+# no CA bundle.
 # util-linux is what entrypoint.sh relies on: setpriv (drop privileges) and
 # mountpoint (never chown a bind mount). Named explicitly so a missing binary
 # fails the build rather than the boot.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      bash git openssh-client util-linux \
+      bash ca-certificates git openssh-client util-linux \
  && rm -rf /var/lib/apt/lists/*
 
 # Install the CLI globally (as root, so it can write to the global prefix).

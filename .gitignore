@@ -1,2 +1,14 @@
+# Local dsh state: .credentials.yaml and the git credential broker live here.
 .dsh
+# Private task notes (router SSH keys, internal addressing).
 .tasks
+
+# The real compose file is the machine-specific copy; the tracked template is
+# docker-compose.example.yml. Hostnames, LAN addresses and proxy settings in it
+# are not meant to be published.
+docker-compose.yml
+# Local secrets per the README (DEEPSEEK_API_KEY / PUID / PGID).
+.env
+# Never commit private keys that happen to land in the working tree.
+id_rsa
+id_ed25519

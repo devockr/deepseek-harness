@@ -1,3 +1,11 @@
+# Template for the real compose file. Copy it and edit the values that are
+# specific to your machine:
+#
+#   cp docker-compose.example.yml docker-compose.yml
+#
+# docker-compose.yml is gitignored on purpose — it is where your own hostnames,
+# LAN addresses and proxy settings live, and those should not be published.
+# Keep this template free of them: use example.com / RFC1918 addresses only.
 services:
   dsh:
     build: .
@@ -15,6 +23,8 @@ services:
       - PUID=${UID}
       - PGID=${GID}
       - NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
+      # Space-separated authorities allowed by dsh's browser-trust fence; set it
+      # to the host (or host:port) you reach this UI on, e.g. dsh.example.com.
       - DSH_TRUSTED_HOSTS=${DSH_TRUSTED_HOSTS:-dsh.example.com}
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
       - http_proxy=${http_proxy:-}
