@@ -2,7 +2,7 @@
 # prebuilt binaries are published for linux-*-gnu only — there is no musl build,
 # so Alpine fails at boot with "No usable native binding found".
 #v24.21.0
-FROM node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6
+FROM node:24.21.0-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6
 
 # Create the account dsh runs as. Its uid/gid here are placeholders only: the
 # real ones arrive at runtime as PUID/PGID and entrypoint.sh re-points this
