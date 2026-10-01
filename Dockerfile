@@ -42,13 +42,18 @@ RUN --mount=type=cache,id=npm_cache,target=/root/.npm npm install -g @deepseek-a
 # mode. Force isLoopbackHostname to always answer true so settings work over the
 # LAN, and drop the desktop-only "open configuration file" action (xdg-open is
 # absent in the container, so it only ever errors).
+# Also stop the phone zooming: iOS ignores the viewport keys, so touch-action takes
+# the pinch and a 16px :read-write floor keeps WebKit out of its focus zoom.
 RUN base="$(npm root -g)/@deepseek-ai/dsh/node_modules/@deepseek-ai" \
  && f="$base/dsh-client-connection/lib/client.js" \
  && sed -i 's/if (hostname === "localhost" || hostname === "\[::1\]")//' "$f" \
  && ! grep -Fq 'if (hostname === "localhost"' "$f" \
  && g="$base/dsh-client-ui-settings-general/lib/client.js" \
  && sed -i 's/const documentController = .*/const documentController = void 0;/' "$g" \
- && ! grep -Fq 'new SettingsDocumentStore' "$g"
+ && ! grep -Fq 'new SettingsDocumentStore' "$g" \
+ && h="$base/dsh-web-frontend/dist/index.html" \
+ && sed -i 's#</head>#<style>@media(pointer:coarse){html{touch-action:pan-x pan-y}select,:read-write:not(.xterm-helper-textarea){font-size:max(16px,1em)!important}}</style></head>#' "$h" \
+ && grep -Fq 'max(16px,1em)' "$h"
 
 COPY --chmod=755 entrypoint.sh /entrypoint.sh
 
