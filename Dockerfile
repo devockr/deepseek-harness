@@ -32,7 +32,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # The web profile's HMR service requires Node's --expose-internals flag, which
 # Node refuses to accept via NODE_OPTIONS, so it is passed in entrypoint.sh.
 # The cache mount persists npm's package cache (named "npm_cache") across builds.
-RUN --mount=type=cache,id=npm_cache,target=/root/.npm npm install -g @deepseek-ai/dsh
+# The version is pinned instead of floating so the build is reproducible; the
+# regex custom manager in renovate.json is what keeps the pin up to date (npm's
+# own manager does not read RUN lines).
+RUN --mount=type=cache,id=npm_cache,target=/root/.npm npm install -g @deepseek-ai/dsh@0.2.0-rc.2
 
 # Bypass the web client's loopback gate: dsh treats a non-loopback page authority
 # (e.g. dsh.example.com) as "remote", which leaves the settings page in memory-only

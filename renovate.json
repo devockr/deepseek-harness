@@ -2,5 +2,18 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "github>1stG/configs"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Keep the dsh version pinned in the Dockerfile up to date",
+      "managerFilePatterns": [
+        "/(^|/)Dockerfile$/"
+      ],
+      "matchStrings": [
+        "npm install -g (?<depName>@?[^\\s@]+)@(?<currentValue>[^\\s]+)"
+      ],
+      "datasourceTemplate": "npm"
+    }
   ]
 }
