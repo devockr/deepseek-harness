@@ -46,6 +46,17 @@ RUN --mount=type=cache,id=npm_cache,target=/root/.npm npm install -g @deepseek-a
 # absent in the container, so it only ever errors).
 # Also stop the phone zooming: iOS ignores the viewport keys, so touch-action takes
 # the pinch and a 16px :read-write floor keeps WebKit out of its focus zoom.
+# The icon step fits the whale to the iOS home screen. The published frontend
+# ships it black and transparent: black ink on a dark Home Screen was the whole
+# complaint, and with nothing opaque behind it iOS's Dark-icon pass has nothing to
+# darken — which is why a tile-less icon never looks like it changes with the
+# appearance. So, in one pass over that one file: the brand-blue tile with the
+# whale knocked out (an opaque mid-tone tile is what iOS darkens, and blue is the
+# one tile colour legible on both sides of that), a widened viewBox to give the
+# glyph app-icon padding, and a raised intrinsic size so a rasteriser starts from
+# 1024px instead of a 50px bitmap it would have to scale up. Patterns match values
+# rather than literals, so a version bump only fails the build if the SVG's
+# *structure* moves, not because a colour or a dimension changed.
 RUN base="$(npm root -g)/@deepseek-ai/dsh/node_modules/@deepseek-ai" \
  && f="$base/dsh-client-connection/lib/client.js" \
  && sed -i 's/if (hostname === "localhost" || hostname === "\[::1\]")//' "$f" \
@@ -55,7 +66,16 @@ RUN base="$(npm root -g)/@deepseek-ai/dsh/node_modules/@deepseek-ai" \
  && ! grep -Fq 'new SettingsDocumentStore' "$g" \
  && h="$base/dsh-web-frontend/dist/index.html" \
  && sed -i 's#</head>#<style>@media(pointer:coarse){html{touch-action:pan-x pan-y}select,:read-write:not(.xterm-helper-textarea){font-size:max(16px,1em)!important}}</style></head>#' "$h" \
- && grep -Fq 'max(16px,1em)' "$h"
+ && grep -Fq 'max(16px,1em)' "$h" \
+ && fav="$base/dsh-web-frontend/dist/favicon.svg" \
+ && sed -i -E \
+      -e 's/fill="#[0-9A-Fa-f]{3,6}"/fill="#FFFFFF"/' \
+      -e 's/viewBox="[^"]*"/viewBox="-7.83 -7.83 66 66"/' \
+      -e 's/width="[0-9.]+" height="[0-9.]+"/width="1024" height="1024"/' \
+      -e 's@<path@<rect x="-7.83" y="-7.83" width="66" height="66" fill="#4D6BFE"/><path@' \
+      "$fav" \
+ && grep -Eq 'width="1024" height="1024" viewBox="-7.83 -7.83 66 66"' "$fav" \
+ && grep -Eq '<rect[^>]*fill="#4D6BFE"/><path[^>]*fill="#FFFFFF"' "$fav"
 
 COPY --chmod=755 entrypoint.sh /entrypoint.sh
 
