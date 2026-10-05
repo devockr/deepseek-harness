@@ -24,8 +24,10 @@ RUN groupadd app && useradd -m -g app -s /bin/bash app
 # util-linux is what entrypoint.sh relies on: setpriv (drop privileges) and
 # mountpoint (never chown a bind mount). Named explicitly so a missing binary
 # fails the build rather than the boot.
+# curl is not needed by dsh: it is installed so `docker exec … curl` can probe
+# the UI and the other services on the box from inside the container.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      bash ca-certificates git openssh-client util-linux \
+      bash ca-certificates curl git openssh-client util-linux \
  && rm -rf /var/lib/apt/lists/*
 
 # Install the CLI globally (as root, so it can write to the global prefix).
