@@ -94,8 +94,7 @@ RUN base="$(npm root -g)/@deepseek-ai/dsh/node_modules/@deepseek-ai" \
       -e 's#event.nativeEvent.isComposing) return;#event.nativeEvent.isComposing || window.matchMedia("(pointer: coarse)").matches) return;#' \
       "$conv" \
  && grep -Pzoq 'window\.matchMedia\("\(pointer: coarse\)"\)\.matches\) \{\n\t\t\t\t\tif \(!editor\.dispatchCommand\(Ue\$2, false\)\) return false;\n\t\t\t\t\tevent\.preventDefault\(\);' "$conv" \
- && grep -Fq 'event.nativeEvent.isComposing || window.matchMedia("(pointer: coarse)").matches) return;' "$conv" \
- && [ "$(grep -Fc 'matchMedia("(pointer: coarse)")' "$conv")" = 2 ]
+ && grep -Fq 'event.nativeEvent.isComposing || window.matchMedia("(pointer: coarse)").matches) return;' "$conv"
 
 COPY --chmod=755 entrypoint.sh /entrypoint.sh
 
