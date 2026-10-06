@@ -6,12 +6,14 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Keep the dsh version pinned in the Dockerfile up to date",
+      "description": "Keep the `npm install -g` pins in the Dockerfile up to date; one or several packages per command are read",
       "managerFilePatterns": [
         "/(^|/)Dockerfile$/"
       ],
+      "matchStringsStrategy": "recursive",
       "matchStrings": [
-        "npm install -g (?<depName>@?[^\\s@]+)@(?<currentValue>[^\\s]+)"
+        "npm install -g (?:\\\\\\n|[^\\n&])+",
+        "(?<depName>@?[^\\s@\\\\]+)@(?<currentValue>[^\\s\\\\]+)"
       ],
       "datasourceTemplate": "npm"
     }
