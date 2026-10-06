@@ -55,6 +55,17 @@ RUN --mount=type=cache,id=npm_cache,target=/root/.npm npm install -g @deepseek-a
 # whale knocked out, an app-icon viewBox, and a 1024px intrinsic size (a 50px
 # bitmap scaled up is visibly soft). Each substitution is anchored to its own
 # element, so the tile cannot be repainted or resized whatever order they run in.
+# Phones have no Shift key, so Enter must not send there: the App inserts a
+# newline and sends from its button. On a coarse pointer the guard inserts the
+# break through the desktop path's command and preventDefaults, rather than
+# letting Lexical's plain-text handler defer to the browser — that round trip lets
+# the DOM caret drag the model back. The slash/@ menu, Ctrl/Cmd+Enter and the
+# queued-row editor keep their behaviour.
+# Known iOS/WebKit limitation: the caret mark can stay on the previous line after
+# a newline until the composer scrolls. The insertion point is still correct —
+# typing lands on the new line and the draft text stays "…\n".
+# The guards below count both anchors and pin the bundler's generated line-break
+# symbol, so a dsh bump fails the build instead of shipping code that throws.
 RUN base="$(npm root -g)/@deepseek-ai/dsh/node_modules/@deepseek-ai" \
  && f="$base/dsh-client-connection/lib/client.js" \
  && sed -i 's/if (hostname === "localhost" || hostname === "\[::1\]")//' "$f" \
@@ -73,7 +84,18 @@ RUN base="$(npm root -g)/@deepseek-ai/dsh/node_modules/@deepseek-ai" \
       -e 's@<path@<rect x="-7.83" y="-7.83" width="66" height="66" fill="#4D6BFE"/><path@' \
       "$fav" \
  && grep -Eq 'width="1024" height="1024" viewBox="-7.83 -7.83 66 66"' "$fav" \
- && grep -Eq '<rect[^>]*fill="#4D6BFE"/><path[^>]*fill="#FFFFFF"' "$fav"
+ && grep -Eq '<rect[^>]*fill="#4D6BFE"/><path[^>]*fill="#FFFFFF"' "$fav" \
+ && conv="$base/dsh-client-ui-conversation/lib/client.js" \
+ && [ "$(grep -Pc '^\t\t\t\tevent\?\.preventDefault\(\);$' "$conv")" = 1 ] \
+ && [ "$(grep -Fc 'event.nativeEvent.isComposing) return;' "$conv")" = 1 ] \
+ && grep -Pq 'Ue\$2 = [^,;]{0,60}"INSERT_LINE_BREAK_COMMAND"' "$conv" \
+ && sed -i \
+      -e 's#^\t\t\t\tevent?.preventDefault();$#\t\t\t\tif (event !== null \&\& !event.ctrlKey \&\& !event.metaKey \&\& window.matchMedia("(pointer: coarse)").matches) {\n\t\t\t\t\tif (!editor.dispatchCommand(Ue$2, false)) return false;\n\t\t\t\t\tevent.preventDefault();\n\t\t\t\t\treturn true;\n\t\t\t\t}\n&#' \
+      -e 's#event.nativeEvent.isComposing) return;#event.nativeEvent.isComposing || window.matchMedia("(pointer: coarse)").matches) return;#' \
+      "$conv" \
+ && grep -Pzoq 'window\.matchMedia\("\(pointer: coarse\)"\)\.matches\) \{\n\t\t\t\t\tif \(!editor\.dispatchCommand\(Ue\$2, false\)\) return false;\n\t\t\t\t\tevent\.preventDefault\(\);' "$conv" \
+ && grep -Fq 'event.nativeEvent.isComposing || window.matchMedia("(pointer: coarse)").matches) return;' "$conv" \
+ && [ "$(grep -Fc 'matchMedia("(pointer: coarse)")' "$conv")" = 2 ]
 
 COPY --chmod=755 entrypoint.sh /entrypoint.sh
 
