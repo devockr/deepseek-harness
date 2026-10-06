@@ -75,4 +75,5 @@ Ports and volumes:
   flags, so they can't override `--profile web`.
 - **Sandbox** — dsh's file sandbox needs user namespaces or Landlock. On hosts without them (e.g. Synology's 4.4 kernel), either set `DSH_PERMISSION_MODE=danger-full-access`, or approve the `danger-full-access` escalation when prompted in the UI.
 - **Settings page** — dsh gates the Models/settings page behind a client-side loopback check. The `Dockerfile` patches that check in the installed bundle, so the page loads over the LAN and settings persist durably (no SSH tunnel needed).
+- **Plugins** — the image installs pnpm (which `dsh plugin` drives), so plugins can be added from the web UI's plugin manager or the CLI, e.g. `docker exec -u app -e HOME=/home/app dsh dsh plugin --profile web add <pkg>` (HOME has to be passed along). Plugins live in the `.dsh` bind mount, so they survive recreations but are not part of the image.
 - **HTTPS reverse proxy** — if you front this with nginx, keep the `Host` header intact (`proxy_set_header Host $http_host;`) so the browser-trust fence passes, and add WebSocket upgrade headers.
