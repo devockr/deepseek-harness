@@ -1,7 +1,7 @@
 # glibc base (not Alpine): dsh 0.2.x depends on node-addon-require-builtin, whose
 # prebuilt binaries are published for linux-*-gnu only — there is no musl build,
 # so Alpine fails at boot with "No usable native binding found".
-FROM node:24.21.0-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6
+FROM node:24.21.0-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20
 
 # Create the account dsh runs as. Its uid/gid here are placeholders only: the
 # real ones arrive at runtime as PUID/PGID and entrypoint.sh re-points this
@@ -47,7 +47,7 @@ ARG NPM_REGISTRY=https://registry.npmmirror.com/
 # pnpm is in the same install because the plugin manager drives it and has no npm
 # fallback, and because it must resolve from the image's PATH: the in-app installer
 # spawns it with a scrubbed environment, so a user-prefix install is invisible.
-RUN --mount=type=cache,id=npm_cache,target=/root/.npm npm install -g --registry="$NPM_REGISTRY" @deepseek-ai/dsh@0.2.0-rc.2 pnpm@12.9.1
+RUN --mount=type=cache,id=npm_cache,target=/root/.npm npm install -g --registry="$NPM_REGISTRY" @deepseek-ai/dsh@0.2.0-rc.2 pnpm@12.10.1
 
 # Bypass the web client's loopback gate: dsh treats a non-loopback page authority
 # (e.g. dsh.example.com) as "remote", which leaves the settings page in memory-only
