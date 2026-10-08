@@ -11,8 +11,7 @@ services:
     build:
       context: .
       args:
-        # Value comes from your shell environment or .env; when NPM_REGISTRY is
-        # unset the Dockerfile's own ARG default applies.
+        # From your shell or .env; the Dockerfile's own default applies when unset.
         - NPM_REGISTRY
     container_name: dsh
     hostname: dsh
@@ -27,20 +26,17 @@ services:
       # Host uid/gid to run dsh as; entrypoint.sh re-points `app` at them.
       - PUID=${UID}
       - PGID=${GID}
-      # The one registry variable, passed through from your shell environment or
-      # .env; when it is unset entrypoint.sh falls back to npmmirror. It becomes
-      # the user-level ~/.npmrc, ~/.yarnrc and ~/.yarnrc.yml every project
-      # inherits — and corepack's and node-gyp's mirrors — then is dropped.
-      # NPM_CONFIG_REGISTRY and YARN_NPM_REGISTRY_SERVER are not read at all: as
+      # The one registry variable, from your shell or .env. entrypoint.sh turns it
+      # into the user-level npm/pnpm/yarn config every project inherits, then drops
+      # it; NPM_CONFIG_REGISTRY / YARN_NPM_REGISTRY_SERVER are not read, since as
       # environment variables they would outrank a project's own config.
       - NPM_REGISTRY
       # Space-separated authorities allowed by dsh's browser-trust fence; set it
       # to the host (or host:port) you reach this UI on, e.g. dsh.example.com.
       - DSH_TRUSTED_HOSTS=${DSH_TRUSTED_HOSTS:-dsh.example.com}
-      # Your key and the proxy settings travel the same way as the registry above:
-      # whatever your shell or .env defines is passed through unchanged, and
-      # nothing is injected when they are unset. dsh reads both proxy spellings and
-      # adds its own loopback bypass, so none of these needs a default here.
+      # Also straight from your shell or .env, and not injected when unset: your
+      # key, and the proxy settings. dsh reads both proxy spellings and adds its
+      # own loopback bypass, so neither needs a default here.
       - DEEPSEEK_API_KEY
       - http_proxy
       - https_proxy
@@ -49,6 +45,6 @@ services:
     ports:
       - "15080:3080"
     volumes:
-      # dsh's own runtime state. Add the mounts you want — a workspace, your
-      # dotfiles, an ssh config — this template deliberately prescribes none.
+      # dsh's own state; everything else you want persisted is yours to add — this
+      # template deliberately prescribes no mounts.
       - ./.dsh:/home/app/.dsh

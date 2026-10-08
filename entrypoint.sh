@@ -45,59 +45,28 @@ else
 fi
 
 # --- Point every package manager at one registry ------------------------------
-# npm, pnpm and yarn do not agree on how a registry is configured, and the
-# environment reaches only one of them: NPM_CONFIG_REGISTRY is honoured by npm,
-# but pnpm and yarn 1 ignore it while installing (measured — with the variable
-# pointed at a dead host, `npm i` fails while `pnpm add` and `yarn add` still
-# resolve through the default registry).
+# Only these user-level files are configured, never the environment: for npm and
+# Yarn 4 an environment variable outranks a project's own configuration and would
+# defeat a project that pins its own registry, while the files merge per key.
 #
-# The single file all three read is ~/.npmrc: npm and pnpm natively, and yarn v1
-# resolves its tarballs through it as well — `yarn config get registry` still
-# prints registry.yarnpkg.com, yet the URL recorded in yarn.lock is the mirror's.
-# ~/.yarnrc is written too, so yarn's own config view tells the truth.
+#   ~/.npmrc       registry=           npm, pnpm and yarn 1
+#   ~/.yarnrc      registry "…"        yarn 1's own config view
+#   ~/.yarnrc.yml  npmRegistryServer:  yarn 2/3/4, the file `config set --home` writes
 #
-# For pnpm this file carries only the npm-compatible keys: it moved its own
-# settings to pnpm-workspace.yaml in v10 — `strict-peer-dependencies` here reads
-# back as undefined, `strictPeerDependencies` there as true — but `registry` is
-# still read and used (measured: a dead registry in this file fails `pnpm add`
-# outright, and `pnpm view <pkg> dist.tarball` answers with the configured one).
-# Its global YAML config, ~/.config/pnpm/config.yaml, is deliberately NOT written:
-# that file outranks even a project's own .npmrc (only the project's
-# pnpm-workspace.yaml beats it), which would break the per-key override above.
+# `NPM_CONFIG_REGISTRY` reaches npm alone, which is why it is not the mechanism.
+# pnpm reads only the npm-compatible keys from .npmrc (its own settings moved to
+# pnpm-workspace.yaml in v10) and its global ~/.config/pnpm/config.yaml is left
+# alone on purpose: that file outranks even a project's own .npmrc. Yarn 1 ignores
+# .yarnrc.yml, so the three files coexist in one home without disturbing anyone.
 #
-# Yarn 2/3/4 (Berry) is a different program that reads none of those: its
-# user-level — the "global" — configuration is ~/.yarnrc.yml, the very file
-# `yarn config set --home npmRegistryServer <url>` writes. It reaches every
-# project, including one that ships its own .yarnrc.yml for other settings, since
-# those files merge per key; only a project that names its own npmRegistryServer
-# takes precedence. Yarn 1 ignores .yarnrc.yml, so both files coexist in the same
-# home without disturbing anyone.
-#
-# These files are the only place the registry is configured, and that is the
-# point: for npm and Yarn 4 an environment variable outranks the project's own
-# .npmrc / .yarnrc.yml, so one would silently defeat a project that pins its own
-# registry. Files merge per key instead — a project that says nothing about the
-# registry inherits the mirror, and one that names a registry wins (measured, as
-# is everything above).
-#
-# Only the account dsh runs as is configured: $HOME, which is /home/app. A root
-# shell is not where package managers are meant to run, and `docker exec` gets the
-# container's environment injected anyway, so a second copy of these files under
-# /root would only be a second thing to keep in sync.
-#
-# NPM_REGISTRY is the one variable this script reads, and it is dropped once the
-# files exist (see below): with the answer already on disk, a variable meaning
-# "use this registry" should not be inherited by every tool dsh spawns as a
-# second, invisible layer of configuration.
-#
-# This runs before the chown below on purpose, so the files end up owned by PUID,
-# and it never overwrites a key that is already set (that is how a user's own
-# ~/.npmrc survives a container restart untouched).
+# Only the account dsh runs as is covered — $HOME, /home/app — since a root shell
+# is not where package managers run. Keys that are already there are kept, so a
+# hand-written file survives a restart, and this runs before the chown below so
+# the new files end up owned by PUID.
 NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmmirror.com/}"
 
-# Add a configuration line, first making sure the file ends with a newline: a
-# hand-edited .yarnrc.yml need not, and without this the new key would be glued
-# onto the previous line instead of becoming its own.
+# Append a line, first ensuring the file ends with a newline, so a hand-edited
+# .yarnrc.yml cannot have the new key glued onto its last line.
 append_line() {
   append_file="$1"
   shift
@@ -116,25 +85,18 @@ if [ -w "$HOME" ]; then
   grep -qs '^npmRegistryServer:' "$HOME/.yarnrc.yml" || append_line "$HOME/.yarnrc.yml" "npmRegistryServer: \"$NPM_REGISTRY\""
 fi
 
-# Two more mirrors have to travel in the environment rather than a file, because
-# the tools reading them have no config file to write: corepack fetches the
-# package managers themselves and ignores .npmrc, and node-gyp fetches the Node
-# headers a native module is compiled against.
-#
-# Corepack's is an npm registry, so it is the same one. Node-gyp's is a fixed
-# binary mirror: whatever base it is given, it asks for
-# /v<version>/node-v<version>-headers.tar.gz next to that version's SHASUMS256.txt,
-# so the registry value cannot be reused verbatim — npmmirror answers 422 at that
-# path, while https://npmmirror.com/mirrors/node serves both, which a full
-# `node-gyp install` confirms with `gyp info ok`. A NODEJS_ORG_MIRROR that reached
-# the container always wins, and a project pinning its own `disturl` is unaffected
-# either way: npm hands that to node-gyp ahead of this. (The `disturl` key of
-# ~/.npmrc is deliberately not written above: it is deprecated, and npm 11 warns
-# about it on *every* command.)
+# Corepack and node-gyp have no config file to write, so their two mirrors have to
+# travel in the environment. Corepack's is the same npm registry; node-gyp's is a
+# binary mirror, because it appends /v<version>/node-v<version>-headers.tar.gz to
+# whatever base it is given — the registry root answers 422 at that path. An
+# inherited value wins, and a project's own `disturl` wins over it for node-gyp.
+# (`disturl` is not written above: it is deprecated, and npm 11 warns about it on
+# every command.)
 export COREPACK_NPM_REGISTRY="$NPM_REGISTRY"
 export NODEJS_ORG_MIRROR="${NODEJS_ORG_MIRROR:-https://npmmirror.com/mirrors/node}"
 
-# The knob has done its job — see the note above for why it does not survive.
+# The knob has done its job: a variable meaning "use this registry" should not be
+# inherited by every tool dsh spawns.
 unset NPM_REGISTRY
 
 # Chown the home directory and every top-level entry that is not itself a
