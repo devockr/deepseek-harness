@@ -76,13 +76,25 @@ append_line() {
   printf '%s\n' "$*" >> "$append_file"
 }
 
+# Add one setting to one file, unless it is already there: npm's ini and yarn's
+# store accept whitespace around the key, so the pattern has to as well. A file
+# that exists but is not writable — a read-only bind mount holding an auth token,
+# say — is left untouched, and a write that fails anyway must not take the
+# container down with it: this is the user's configuration, not a precondition.
+add_setting() {
+  if [ -e "$1" ] && [ ! -w "$1" ]; then
+    return 0
+  fi
+  grep -qsE "$2" "$1" || append_line "$1" "$3" || true
+}
+
 if [ -w "$HOME" ]; then
   # npm, and through it pnpm and yarn 1.
-  grep -qs '^registry='          "$HOME/.npmrc"      || append_line "$HOME/.npmrc"      "registry=$NPM_REGISTRY"
-  # yarn 1's own config view.
-  grep -qs '^registry '          "$HOME/.yarnrc"     || append_line "$HOME/.yarnrc"     "registry \"$NPM_REGISTRY\""
+  add_setting "$HOME/.npmrc" '^[[:space:]]*registry[[:space:]]*=' "registry=$NPM_REGISTRY"
+  # yarn 1's own config view: `registry "…"`, sometimes written `--registry`.
+  add_setting "$HOME/.yarnrc" '^[[:space:]]*(-{1,2})?registry[[:space:]=]' "registry \"$NPM_REGISTRY\""
   # yarn 2/3/4 (Berry), global for every project.
-  grep -qs '^npmRegistryServer:' "$HOME/.yarnrc.yml" || append_line "$HOME/.yarnrc.yml" "npmRegistryServer: \"$NPM_REGISTRY\""
+  add_setting "$HOME/.yarnrc.yml" '^[[:space:]]*npmRegistryServer[[:space:]]*:' "npmRegistryServer: \"$NPM_REGISTRY\""
 fi
 
 # Corepack and node-gyp have no config file to write, so their two mirrors have to
