@@ -44,6 +44,73 @@ else
   [ "$CUR" = app ] || usermod -d /home/app -s /bin/bash "$CUR"
 fi
 
+# --- Point every package manager at one registry ------------------------------
+# The registry is only ever configured in these user-level files, never through an
+# environment variable: npm honours NPM_CONFIG_REGISTRY, but pnpm and yarn 1 ignore
+# it while installing, and an environment variable outranks a project's own
+# configuration, which would defeat a project that pins its own registry. The files
+# merge per key instead.
+#
+#   ~/.npmrc       registry=           npm, pnpm and yarn 1
+#   ~/.yarnrc      registry "…"        yarn 1's own config view
+#   ~/.yarnrc.yml  npmRegistryServer:  yarn 2/3/4, the file `config set --home` writes
+#
+# pnpm reads only the npm-compatible keys from .npmrc (its own settings moved to
+# pnpm-workspace.yaml in v10) and its global ~/.config/pnpm/config.yaml is left
+# alone on purpose: that file outranks even a project's own .npmrc. Yarn 1 ignores
+# .yarnrc.yml, so the three files coexist in one home without disturbing anyone.
+#
+# Only the account dsh runs as is covered — $HOME, /home/app — since a root shell
+# is not where package managers run. Keys that are already there are kept, so a
+# hand-written file survives a restart, and this runs before the chown below so
+# the new files end up owned by PUID.
+NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmmirror.com/}"
+
+# Append a line, first ensuring the file ends with a newline, so a hand-edited
+# config file cannot have the new key glued onto its last line.
+append_line() {
+  append_file="$1"
+  shift
+  if [ -s "$append_file" ] && [ -n "$(tail -c 1 "$append_file")" ]; then
+    printf '\n' >> "$append_file"
+  fi
+  printf '%s\n' "$*" >> "$append_file"
+}
+
+# Add one setting to one file, unless it is already there: npm's ini and yarn 1's
+# store ignore whitespace around the key, so those patterns allow it, while the
+# YAML one is anchored at column 0 — indentation there means nesting, not spacing,
+# and `npmScopes.<scope>.npmRegistryServer` is only that scope's registry. A file
+# that exists but is not writable — a read-only bind mount holding an auth token,
+# say — is left untouched, and a write that fails anyway must not take the
+# container down with it: this is the user's configuration, not a precondition.
+add_setting() {
+  if [ -e "$1" ] && [ ! -w "$1" ]; then
+    return 0
+  fi
+  grep -qsE "$2" "$1" || append_line "$1" "$3" || true
+}
+
+if [ -w "$HOME" ]; then
+  add_setting "$HOME/.npmrc" '^[[:space:]]*registry[[:space:]]*=' "registry=$NPM_REGISTRY"
+  add_setting "$HOME/.yarnrc" '^[[:space:]]*(-{1,2})?registry[[:space:]=]' "registry \"$NPM_REGISTRY\""
+  add_setting "$HOME/.yarnrc.yml" '^npmRegistryServer[[:space:]]*:' "npmRegistryServer: \"$NPM_REGISTRY\""
+fi
+
+# Corepack and node-gyp have no config file to write, so their two mirrors have to
+# travel in the environment. Corepack's is the same npm registry; node-gyp's is a
+# binary mirror, because it appends /v<version>/node-v<version>-headers.tar.gz to
+# whatever base it is given — the registry root answers 422 at that path. An
+# inherited value wins, and a project's own `disturl` wins over it for node-gyp.
+# (`disturl` is not written above: it is deprecated, and npm 11 warns about it on
+# every command.)
+export COREPACK_NPM_REGISTRY="$NPM_REGISTRY"
+export NODEJS_ORG_MIRROR="${NODEJS_ORG_MIRROR:-https://npmmirror.com/mirrors/node}"
+
+# NPM_REGISTRY has done its job: a variable meaning "use this registry" should not
+# be inherited by every tool dsh spawns.
+unset NPM_REGISTRY
+
 # Chown the home directory and every top-level entry that is not itself a
 # bind-mount point. The mounts are owned by whoever owns them on the host, and
 # this image is published for arbitrary mount layouts, so we can't assume their

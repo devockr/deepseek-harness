@@ -30,6 +30,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       bash ca-certificates curl git openssh-client util-linux \
  && rm -rf /var/lib/apt/lists/*
 
+# Where the build fetches dsh and pnpm from. The compose file passes the host's
+# NPM_REGISTRY through when it is set, so this default covers an unset variable and
+# a bare `docker build .`. Handed to npm as a flag rather than written into the
+# image's npm config: the runtime registry is entrypoint.sh's business. Keep both
+# pins on the RUN line below — renovate's regex reads `npm install -g` to its end.
+ARG NPM_REGISTRY=https://registry.npmmirror.com/
+
 # Install the CLI globally (as root, so it can write to the global prefix).
 # The web profile's HMR service requires Node's --expose-internals flag, which
 # Node refuses to accept via NODE_OPTIONS, so it is passed in entrypoint.sh.
@@ -40,7 +47,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # pnpm is in the same install because the plugin manager drives it and has no npm
 # fallback, and because it must resolve from the image's PATH: the in-app installer
 # spawns it with a scrubbed environment, so a user-prefix install is invisible.
-RUN --mount=type=cache,id=npm_cache,target=/root/.npm npm install -g @deepseek-ai/dsh@0.2.0-rc.2 pnpm@12.9.1
+RUN --mount=type=cache,id=npm_cache,target=/root/.npm npm install -g --registry="$NPM_REGISTRY" @deepseek-ai/dsh@0.2.0-rc.2 pnpm@12.9.1
 
 # Bypass the web client's loopback gate: dsh treats a non-loopback page authority
 # (e.g. dsh.example.com) as "remote", which leaves the settings page in memory-only

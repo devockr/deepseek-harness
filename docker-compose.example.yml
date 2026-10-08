@@ -8,7 +8,11 @@
 # Keep this template free of them: use example.com / RFC1918 addresses only.
 services:
   dsh:
-    build: .
+    build:
+      context: .
+      args:
+        # From your shell or .env; the Dockerfile's own default applies when unset.
+        - NPM_REGISTRY
     container_name: dsh
     hostname: dsh
     # Start as root so entrypoint.sh can re-point the image's `app` account at
@@ -22,18 +26,24 @@ services:
       # Host uid/gid to run dsh as; entrypoint.sh re-points `app` at them.
       - PUID=${UID}
       - PGID=${GID}
-      - NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
+      # The one registry variable, from your shell or .env. entrypoint.sh turns it
+      # into the user-level npm/pnpm/yarn config every project inherits, then drops
+      # it; NPM_CONFIG_REGISTRY / YARN_NPM_REGISTRY_SERVER are not read, since as
+      # environment variables they would outrank a project's own config.
+      - NPM_REGISTRY
       # Space-separated authorities allowed by dsh's browser-trust fence; set it
       # to the host (or host:port) you reach this UI on, e.g. dsh.example.com.
       - DSH_TRUSTED_HOSTS=${DSH_TRUSTED_HOSTS:-dsh.example.com}
-      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
-      - http_proxy=${http_proxy:-}
-      - https_proxy=${https_proxy:-}
-      - all_proxy=${all_proxy:-}
-      - no_proxy=${no_proxy:-}
+      # Your key and the proxy settings, likewise from your shell or .env: an unset
+      # one is left unset rather than injected empty, and dsh reads both proxy
+      # spellings and adds its own loopback bypass.
+      - DEEPSEEK_API_KEY
+      - http_proxy
+      - https_proxy
+      - all_proxy
+      - no_proxy
     ports:
       - "15080:3080"
     volumes:
+      # Only dsh's own state: what else to mount is yours to decide.
       - ./.dsh:/home/app/.dsh
-      - ..:/home/app/Workspaces
-      - ~/.dotfiles:/home/app/.dotfiles
