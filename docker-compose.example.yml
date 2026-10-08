@@ -45,6 +45,6 @@ services:
     ports:
       - "15080:3080"
     volumes:
+      # dsh's own runtime state. Add the mounts you want — a workspace, your
+      # dotfiles, an ssh config — this template deliberately prescribes none.
       - ./.dsh:/home/app/.dsh
-      - ..:/home/app/Workspaces
-      - ~/.dotfiles:/home/app/.dotfiles
