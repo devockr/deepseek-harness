@@ -77,8 +77,10 @@ append_line() {
   printf '%s\n' "$*" >> "$append_file"
 }
 
-# Add one setting to one file, unless it is already there: npm's ini and yarn's
-# store accept whitespace around the key, so the pattern has to as well. A file
+# Add one setting to one file, unless it is already there: npm's ini and yarn 1's
+# store ignore whitespace around the key, so those patterns allow it, while the
+# YAML one is anchored at column 0 — indentation there means nesting, not spacing,
+# and `npmScopes.<scope>.npmRegistryServer` is only that scope's registry. A file
 # that exists but is not writable — a read-only bind mount holding an auth token,
 # say — is left untouched, and a write that fails anyway must not take the
 # container down with it: this is the user's configuration, not a precondition.
@@ -92,7 +94,7 @@ add_setting() {
 if [ -w "$HOME" ]; then
   add_setting "$HOME/.npmrc" '^[[:space:]]*registry[[:space:]]*=' "registry=$NPM_REGISTRY"
   add_setting "$HOME/.yarnrc" '^[[:space:]]*(-{1,2})?registry[[:space:]=]' "registry \"$NPM_REGISTRY\""
-  add_setting "$HOME/.yarnrc.yml" '^[[:space:]]*npmRegistryServer[[:space:]]*:' "npmRegistryServer: \"$NPM_REGISTRY\""
+  add_setting "$HOME/.yarnrc.yml" '^npmRegistryServer[[:space:]]*:' "npmRegistryServer: \"$NPM_REGISTRY\""
 fi
 
 # Corepack and node-gyp have no config file to write, so their two mirrors have to
