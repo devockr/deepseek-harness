@@ -37,11 +37,15 @@ services:
       # Space-separated authorities allowed by dsh's browser-trust fence; set it
       # to the host (or host:port) you reach this UI on, e.g. dsh.example.com.
       - DSH_TRUSTED_HOSTS=${DSH_TRUSTED_HOSTS:-dsh.example.com}
-      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
-      - http_proxy=${http_proxy:-}
-      - https_proxy=${https_proxy:-}
-      - all_proxy=${all_proxy:-}
-      - no_proxy=${no_proxy:-}
+      # Your key and the proxy settings travel the same way as the registry above:
+      # whatever your shell or .env defines is passed through unchanged, and
+      # nothing is injected when they are unset. dsh reads both proxy spellings and
+      # adds its own loopback bypass, so none of these needs a default here.
+      - DEEPSEEK_API_KEY
+      - http_proxy
+      - https_proxy
+      - all_proxy
+      - no_proxy
     ports:
       - "15080:3080"
     volumes:
