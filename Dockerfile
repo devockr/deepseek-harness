@@ -30,12 +30,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       bash ca-certificates curl git openssh-client util-linux \
  && rm -rf /var/lib/apt/lists/*
 
-# Where the build fetches dsh and pnpm from. docker-compose passes the host's
-# NPM_REGISTRY through by name and drops a build arg it cannot resolve, so this
-# default also covers a bare `docker build .`. Handed to npm as a flag rather than
-# written into the image's npm config, since the runtime registry is
-# entrypoint.sh's business. Keep both pins on the RUN line below: renovate's regex
-# reads `npm install -g` only to the end of that line.
+# Where the build fetches dsh and pnpm from. The compose file passes the host's
+# NPM_REGISTRY through when it is set, so this default covers an unset variable and
+# a bare `docker build .`. Handed to npm as a flag rather than written into the
+# image's npm config: the runtime registry is entrypoint.sh's business. Keep both
+# pins on the RUN line below — renovate's regex reads `npm install -g` to its end.
 ARG NPM_REGISTRY=https://registry.npmmirror.com/
 
 # Install the CLI globally (as root, so it can write to the global prefix).

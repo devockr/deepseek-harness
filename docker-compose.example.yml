@@ -34,9 +34,9 @@ services:
       # Space-separated authorities allowed by dsh's browser-trust fence; set it
       # to the host (or host:port) you reach this UI on, e.g. dsh.example.com.
       - DSH_TRUSTED_HOSTS=${DSH_TRUSTED_HOSTS:-dsh.example.com}
-      # Also straight from your shell or .env, and not injected when unset: your
-      # key, and the proxy settings. dsh reads both proxy spellings and adds its
-      # own loopback bypass, so neither needs a default here.
+      # Your key and the proxy settings, likewise from your shell or .env: an unset
+      # one is left unset rather than injected empty, and dsh reads both proxy
+      # spellings and adds its own loopback bypass.
       - DEEPSEEK_API_KEY
       - http_proxy
       - https_proxy
@@ -45,6 +45,5 @@ services:
     ports:
       - "15080:3080"
     volumes:
-      # dsh's own state; everything else you want persisted is yours to add — this
-      # template deliberately prescribes no mounts.
+      # Only dsh's own state: what else to mount is yours to decide.
       - ./.dsh:/home/app/.dsh

@@ -45,15 +45,16 @@ else
 fi
 
 # --- Point every package manager at one registry ------------------------------
-# Only these user-level files are configured, never the environment: for npm and
-# Yarn 4 an environment variable outranks a project's own configuration and would
-# defeat a project that pins its own registry, while the files merge per key.
+# The registry is only ever configured in these user-level files, never through an
+# environment variable: npm honours NPM_CONFIG_REGISTRY, but pnpm and yarn 1 ignore
+# it while installing, and an environment variable outranks a project's own
+# configuration, which would defeat a project that pins its own registry. The files
+# merge per key instead.
 #
 #   ~/.npmrc       registry=           npm, pnpm and yarn 1
 #   ~/.yarnrc      registry "…"        yarn 1's own config view
 #   ~/.yarnrc.yml  npmRegistryServer:  yarn 2/3/4, the file `config set --home` writes
 #
-# `NPM_CONFIG_REGISTRY` reaches npm alone, which is why it is not the mechanism.
 # pnpm reads only the npm-compatible keys from .npmrc (its own settings moved to
 # pnpm-workspace.yaml in v10) and its global ~/.config/pnpm/config.yaml is left
 # alone on purpose: that file outranks even a project's own .npmrc. Yarn 1 ignores
@@ -66,7 +67,7 @@ fi
 NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmmirror.com/}"
 
 # Append a line, first ensuring the file ends with a newline, so a hand-edited
-# .yarnrc.yml cannot have the new key glued onto its last line.
+# config file cannot have the new key glued onto its last line.
 append_line() {
   append_file="$1"
   shift
@@ -89,11 +90,8 @@ add_setting() {
 }
 
 if [ -w "$HOME" ]; then
-  # npm, and through it pnpm and yarn 1.
   add_setting "$HOME/.npmrc" '^[[:space:]]*registry[[:space:]]*=' "registry=$NPM_REGISTRY"
-  # yarn 1's own config view: `registry "…"`, sometimes written `--registry`.
   add_setting "$HOME/.yarnrc" '^[[:space:]]*(-{1,2})?registry[[:space:]=]' "registry \"$NPM_REGISTRY\""
-  # yarn 2/3/4 (Berry), global for every project.
   add_setting "$HOME/.yarnrc.yml" '^[[:space:]]*npmRegistryServer[[:space:]]*:' "npmRegistryServer: \"$NPM_REGISTRY\""
 fi
 
@@ -107,8 +105,8 @@ fi
 export COREPACK_NPM_REGISTRY="$NPM_REGISTRY"
 export NODEJS_ORG_MIRROR="${NODEJS_ORG_MIRROR:-https://npmmirror.com/mirrors/node}"
 
-# The knob has done its job: a variable meaning "use this registry" should not be
-# inherited by every tool dsh spawns.
+# NPM_REGISTRY has done its job: a variable meaning "use this registry" should not
+# be inherited by every tool dsh spawns.
 unset NPM_REGISTRY
 
 # Chown the home directory and every top-level entry that is not itself a
