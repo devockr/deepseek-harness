@@ -30,6 +30,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       bash ca-certificates curl git openssh-client util-linux \
  && rm -rf /var/lib/apt/lists/*
 
+# The registry the global install below resolves through, so the build does not
+# crawl through registry.npmjs.org from a network that cannot reach it well. This
+# default therefore covers both a bare `docker build .` and the compose file
+# passing the key without a value: compose drops a build arg it cannot resolve
+# from the environment — compose-go's MappingWithEquals.Resolve leaves it nil and
+# docker/compose's flatten() skips nil values — so an unset NPM_REGISTRY means no
+# --build-arg at all, not an empty one.
+# It is handed to npm as a flag rather than written into the image's npm config:
+# the runtime registry is entrypoint.sh's business, and this way a build-time
+# choice leaves nothing behind in a layer.
+# The two pins must stay on the RUN line below, with the flag: renovate's regex
+# custom manager reads `npm install -g` only up to the end of that line.
+ARG NPM_REGISTRY=https://registry.npmmirror.com/
+
 # Install the CLI globally (as root, so it can write to the global prefix).
 # The web profile's HMR service requires Node's --expose-internals flag, which
 # Node refuses to accept via NODE_OPTIONS, so it is passed in entrypoint.sh.
@@ -40,7 +54,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # pnpm is in the same install because the plugin manager drives it and has no npm
 # fallback, and because it must resolve from the image's PATH: the in-app installer
 # spawns it with a scrubbed environment, so a user-prefix install is invisible.
-RUN --mount=type=cache,id=npm_cache,target=/root/.npm npm install -g @deepseek-ai/dsh@0.2.0-rc.2 pnpm@12.9.1
+RUN --mount=type=cache,id=npm_cache,target=/root/.npm npm install -g --registry="$NPM_REGISTRY" @deepseek-ai/dsh@0.2.0-rc.2 pnpm@12.9.1
 
 # Bypass the web client's loopback gate: dsh treats a non-loopback page authority
 # (e.g. dsh.example.com) as "remote", which leaves the settings page in memory-only

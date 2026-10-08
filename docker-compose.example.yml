@@ -8,7 +8,12 @@
 # Keep this template free of them: use example.com / RFC1918 addresses only.
 services:
   dsh:
-    build: .
+    build:
+      context: .
+      args:
+        # Value comes from your shell environment or .env; when NPM_REGISTRY is
+        # unset the Dockerfile's own ARG default applies.
+        - NPM_REGISTRY
     container_name: dsh
     hostname: dsh
     # Start as root so entrypoint.sh can re-point the image's `app` account at
@@ -22,7 +27,13 @@ services:
       # Host uid/gid to run dsh as; entrypoint.sh re-points `app` at them.
       - PUID=${UID}
       - PGID=${GID}
-      - NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
+      # The one registry variable, passed through from your shell environment or
+      # .env; when it is unset entrypoint.sh falls back to npmmirror. It becomes
+      # the user-level ~/.npmrc, ~/.yarnrc and ~/.yarnrc.yml every project
+      # inherits — and corepack's and node-gyp's mirrors — then is dropped.
+      # NPM_CONFIG_REGISTRY and YARN_NPM_REGISTRY_SERVER are not read at all: as
+      # environment variables they would outrank a project's own config.
+      - NPM_REGISTRY
       # Space-separated authorities allowed by dsh's browser-trust fence; set it
       # to the host (or host:port) you reach this UI on, e.g. dsh.example.com.
       - DSH_TRUSTED_HOSTS=${DSH_TRUSTED_HOSTS:-dsh.example.com}
