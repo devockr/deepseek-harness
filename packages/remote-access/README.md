@@ -3,7 +3,7 @@ description: "Reach a dsh Web profile from another machine: bind every interface
 kind: "package-bundle"
 ---
 
-# @idsh/plugin-remote-access
+# @idsh/remote-access
 
 ## Summary
 
@@ -30,7 +30,7 @@ It is config only: no code, no dependency, and no entry touched other than
 ## Use this package
 
 ```sh
-dsh plugin --profile web add @idsh/plugin-remote-access
+dsh plugin --profile web add @idsh/remote-access
 ```
 
 or install it from the Web UI's **Plugins** page. With HMR the profile recomposes
@@ -41,11 +41,31 @@ boot. The install adds the package to the profile and selects it in
 Inside the container of this repository:
 
 ```sh
-docker exec -u app -e HOME=/home/app dsh dsh plugin --profile web add @idsh/plugin-remote-access
+docker exec -u app -e HOME=/home/app dsh dsh plugin --profile web add @idsh/remote-access
 ```
 
 The image's `entrypoint.sh` already passes a `webserver` overlay of its own, so for
 that container only the heartbeat half of this bundle is new.
+
+## This is the LAN answer, not the tunnel answer
+
+This package assumes the browser can already reach the machine — same network, or
+a network you control. For reaching a host behind NAT from anywhere, the answer is
+a reverse tunnel instead, and someone has published that:
+[`@froststarinquire/dsh-remote-access-web`](https://github.com/wikkd/dsh-remote-access-web)
+(frp-based, MIT). Note it targets the `0.1.0-rc.x` dsh line: on `0.2.x` dsh refuses
+it as an incompatible DSH peer range, and the `--remote-auth` /
+`--allow-remote-privileged` surfaces its launch contract needs are not part of the
+`0.2.x` web app.
+
+## A side effect worth knowing: the directory picker
+
+`dsh-host-directory-picker-auto` resolves the directory-picking interaction once at
+boot: `native` requires a **loopback-only bind**, a non-SSH launch and a servable
+display session, and *anything ambiguous resolves to `browse`*. Binding every
+interface therefore lands on the in-app browse dialog, which works for a remote
+operator — so "Add workspace" keeps working. A loopback-bind tunnel deployment does
+not get this for free and has to pin the picker explicitly.
 
 ## What it changes
 

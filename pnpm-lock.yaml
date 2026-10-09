@@ -8,4 +8,4 @@ importers:
 
   .: {}
 
-  packages/plugin-remote-access: {}
+  packages/remote-access: {}
