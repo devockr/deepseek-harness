@@ -22,10 +22,19 @@ services:
     # `docker exec -u app ...` for a shell as the working user.
     user: "0:0"
     restart: always
+    # PID 1 must reap orphans: dsh's tools daemonize (wrangler, `nohup ... &`),
+    # those reparent to PID 1, and Node only waits on children it spawned itself, so
+    # they pile up as zombies. Docker's init reaps them instead.
+    init: true
     environment:
       # Host uid/gid to run dsh as; entrypoint.sh re-points `app` at them.
-      - PUID=${UID}
-      - PGID=${GID}
+      # `:?` is load-bearing: UID/GID live in the environment only under some shells
+      # (zsh/bash export them, most others do not), and an empty value silently falls
+      # through to entrypoint.sh's ${PUID:-1000} — the container would run as uid
+      # 1000. Fail loudly instead; from a shell that does not export them, use
+      # `UID=$(id -u) GID=$(id -g) docker compose up -d`.
+      - "PUID=${UID:?UID is not set - export it or pass it explicitly}"
+      - "PGID=${GID:?GID is not set - export it or pass it explicitly}"
       # The one registry variable, from your shell or .env. entrypoint.sh turns it
       # into the user-level npm/pnpm/yarn config every project inherits, then drops
       # it; NPM_CONFIG_REGISTRY / YARN_NPM_REGISTRY_SERVER are not read, since as
