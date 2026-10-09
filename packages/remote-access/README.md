@@ -47,16 +47,33 @@ docker exec -u app -e HOME=/home/app dsh dsh plugin --profile web add @idsh/remo
 The image's `entrypoint.sh` already passes a `webserver` overlay of its own, so for
 that container only the heartbeat half of this bundle is new.
 
-## This is the LAN answer, not the tunnel answer
+## Where this fits
 
-This package assumes the browser can already reach the machine — same network, or
-a network you control. For reaching a host behind NAT from anywhere, the answer is
-a reverse tunnel instead, and someone has published that:
+Reaching a dsh host from another machine needs two things, and both of them are
+configuration dsh leaves to you. This package covers both.
+
+**The host has to be dialable.** Binding every interface is enough whenever the
+host already has an address a browser can reach — a public IPv6 address with the
+firewall opened, a forwarded port, a relay in front — and it is also what lets a
+browser on the same network in. It is *not* what gets you through NAT: if the host
+has no dialable address, put a reverse tunnel in front instead.
 [`@froststarinquire/dsh-remote-access-web`](https://github.com/wikkd/dsh-remote-access-web)
-(frp-based, MIT). Note it targets the `0.1.0-rc.x` dsh line: on `0.2.x` dsh refuses
-it as an incompatible DSH peer range, and the `--remote-auth` /
-`--allow-remote-privileged` surfaces its launch contract needs are not part of the
-`0.2.x` web app.
+publishes one (frp-based, MIT). It is a different layer, not a replacement: a
+tunnel changes how the browser reaches the host, while the heartbeat below is what
+keeps the UI's socket alive across the extra hop. Two caveats if you go that way —
+it targets the `0.1.0-rc.x` dsh line, and `0.2.x` refuses it as an incompatible DSH
+peer range (the `--remote-auth` / `--allow-remote-privileged` surfaces its launch
+contract wants are not part of the `0.2.x` web app either).
+
+**The connection has to survive the distance.** This is the half the package was
+written for. The Remote mux is one long-lived WebSocket, and the shipped heartbeat
+gives it roughly 4-6 seconds of slack before the Host terminates it. That is fine
+across a desk; over a long-distance path it is not — a Wi-Fi roam, a GC pause, a
+route flap or a proxy hiccup is enough to drop the UI and force a reconnect. The
+30-second interval here came out of exactly that: a `dsh web` deployment reached
+over the public internet from another city, where a few seconds of stall on the way
+was making the UI drop for no real reason.
+
 
 ## A side effect worth knowing: the directory picker
 
@@ -123,9 +140,10 @@ values does not have to change or remove this package:
   after a real drop starts later than it would on the default.
 - Ping volume is unchanged in kind and negligible either way: one control frame
   per open socket per interval.
-- 30000 suits a link with a proxy in the middle; a loopback-only setup gains
-  nothing from it — and a loopback-only setup should not install this package at
-  all, since the bind is the point.
+- 30000 is a deliberate middle: it absorbs the seconds-long stalls a long-distance or
+  proxied path produces, while a socket that is genuinely gone is still cleaned up
+  within ~90s. Lower it if you would rather fail fast, raise it for a satellite or
+  heavily proxied link — the profile patch above wins over this bundle either way.
 
 ## Compatibility
 
