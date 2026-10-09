@@ -1,7 +1,7 @@
 {
-  "name": "@idsh/plugin-heartbeat",
+  "name": "@idsh/plugin-remote-access",
   "version": "0.1.0",
-  "description": "Raise the Remote-mux WebSocket heartbeat interval so a flaky or proxied link stops terminating the Web UI's connection",
+  "description": "Reach a dsh Web profile from another machine: bind every interface and keep the UI's Remote-mux WebSocket alive across a flaky or proxied link",
   "license": "MIT",
   "type": "module",
   "keywords": [
@@ -9,13 +9,15 @@
     "deepseek-harness",
     "cordis",
     "bundle",
+    "lan",
+    "remote",
     "websocket",
     "heartbeat"
   ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/devockr/deepseek-harness.git",
-    "directory": "packages/plugin-heartbeat"
+    "directory": "packages/plugin-remote-access"
   },
   "files": [
     "cordis.patch.yml"

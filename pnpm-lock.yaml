@@ -8,4 +8,4 @@ importers:
 
   .: {}
 
-  packages/plugin-heartbeat: {}
+  packages/plugin-remote-access: {}
