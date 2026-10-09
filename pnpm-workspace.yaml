@@ -1,0 +1,4 @@
+# The image needs exactly one file from this tree (entrypoint.sh), so the
+# workspace is purely for the companion plugins under packages/ — see README.
+packages:
+  - packages/*
