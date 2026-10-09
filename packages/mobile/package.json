@@ -1,0 +1,49 @@
+{
+  "name": "@idsh/mobile",
+  "version": "0.1.0",
+  "description": "The touch-device half of a dsh Web profile: coarse-pointer CSS, Enter inserting a line break instead of sending, and an iOS home-screen icon — the things the self-hosted image carried as build-time patches",
+  "license": "MIT",
+  "type": "module",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "cordis",
+    "bundle",
+    "client",
+    "mobile",
+    "touch"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/devockr/deepseek-harness.git",
+    "directory": "packages/mobile"
+  },
+  "main": "lib/index.js",
+  "files": [
+    "lib/index.js",
+    "lib/client.js",
+    "cordis.patch.yml"
+  ],
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true
+    }
+  }
+}

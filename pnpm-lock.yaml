@@ -12,6 +12,8 @@ importers:
         specifier: ^1.64.0
         version: 1.64.0
 
+  packages/mobile: {}
+
   packages/privileged-ui: {}
 
   packages/remote-access: {}
