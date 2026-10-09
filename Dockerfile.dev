@@ -1,0 +1,64 @@
+# The dev image: everything the published image is built from, plus the shared libraries
+# chrome-headless-shell links. It is a separate file on purpose — the deployment build must never
+# pick these up by accident — and it is built from Dockerfile's `base` target instead of the
+# published image, so it does not depend on the plugins being published.
+#
+#   docker build --target base -t deepseek-harness-dsh:base .
+#   docker build -f Dockerfile.dev -t deepseek-harness-dsh:dev .
+#
+# Then run a browser-driven check in it, sharing the deployment's state and network namespace
+# so it can reach the running GUI on 127.0.0.1. `--entrypoint` is required: without it the
+# image's own entrypoint reads the command as dsh arguments and boots a second server
+# instead. `--user` matches the deployment's, so nothing it writes into the mounts is owned
+# by root. The checkout is mounted explicitly — the default compose file mounts only dsh's
+# state, so `--volumes-from dsh` alone would not carry the script:
+#
+#   docker run --rm --network container:dsh --volumes-from dsh --user "$UID:$GID" \
+#     --entrypoint node -v "$PWD:/checkout" -w /checkout \
+#     deepseek-harness-dsh:dev <check>.mjs
+#
+# The browser binary itself is not in either image: it lives in the mounted cache
+# (~/.dsh/cache/ms-playwright, populated once with `pnpm exec playwright install`), which is
+# why the checks that drive it set PLAYWRIGHT_BROWSERS_PATH.
+#
+# The library list is measured, not `playwright install-deps chromium`'s. That one also
+# serves *headed* Chromium, so it carries xvfb, five font packages, xfonts-scalable and the
+# pango/cairo/freetype/fontconfig stack (57MB of its 71MB); `ldd chrome-headless-shell` on a
+# clean bookworm asks for 21 sonames instead.
+#
+# Nine names, not twenty-one: the other libs the browser links are hard dependencies of
+# these, so apt brings them along (libx11-6, libxext6, libxcb1, libglib2.0-0, libexpat1,
+# libdbus-1-3, libnspr4, libatk1.0-0, libatspi2.0-0 — `apt-cache depends --recurse` on the
+# nine covers all of them). libxfixes3 is explicit because nothing in bookworm depends on
+# it. There is no Debian meta-package for this set: the one-name shortcuts are both heavier
+# and incomplete (`chromium` drags a whole browser, `libgtk-3-0` drags GTK + pango + cairo
+# and still misses nss/nspr/asound/gbm). The checks that drive this browser assert DOM and
+# computed CSS, never pixels, so fonts are not needed — add fonts-liberation + libfontconfig1
+# + libfreetype6 if readable screenshots ever matter.
+ARG BASE=deepseek-harness-dsh:base
+FROM ${BASE}
+
+# An ARG before FROM is only usable in the FROM line, so the registry has to be declared again.
+ARG NPM_REGISTRY=https://registry.npmmirror.com/
+
+# The same baked profile as the published image, from this checkout instead of the registry. It
+# links rather than copies, so a deployment that mounts a checkout over /opt/dsh/packages runs that
+# source and sees edits immediately.
+# `--chmod` is not decoration: COPY takes the modes from the build context, so a builder with
+# a strict umask would ship them 0600 root:root and the runtime user could not read them.
+COPY --chmod=755 packages/ /opt/dsh/packages/
+RUN mkdir -p /opt/dsh/home \
+ && export HOME=/opt/dsh/home \
+ && printf 'registry=%s\n' "$NPM_REGISTRY" > "$HOME/.npmrc" \
+ && dsh web --dump-config >/dev/null \
+ && for d in /opt/dsh/packages/*/; do \
+      [ -f "${d}package.json" ] && grep -q '"dsh"' "${d}package.json" || continue; \
+      dsh plugin --profile web add "link:${d%/}"; \
+    done \
+ && test -f /opt/dsh/home/.dsh/profiles/web/package.json
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libatk-bridge2.0-0 libgbm1 libxrandr2 libxcomposite1 libxdamage1 libxfixes3 \
+      libxkbcommon0 libnss3 libasound2 \
+ && rm -rf /var/lib/apt/lists/*
+

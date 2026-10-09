@@ -1,7 +1,7 @@
 # glibc base (not Alpine): dsh 0.2.x depends on node-addon-require-builtin, whose
 # prebuilt binaries are published for linux-*-gnu only — there is no musl build,
 # so Alpine fails at boot with "No usable native binding found".
-FROM node:24.21.0-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20
+FROM node:24.21.0-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20 AS base
 
 # Create the account dsh runs as. Its uid/gid here are placeholders only: the
 # real ones arrive at runtime as PUID/PGID and entrypoint.sh re-points this
@@ -26,6 +26,12 @@ RUN groupadd app && useradd -m -g app -s /bin/bash app
 # fails the build rather than the boot.
 # curl is not needed by dsh: it is installed so `docker exec … curl` can probe
 # the UI and the other services on the box from inside the container.
+
+# Browser libraries for browser-driven checks are deliberately *not* here: they are ~14MB of
+# shared libraries for a tool the deployment never runs. They live in Dockerfile.dev, which is
+# built from this file's `base` target and tagged separately (see "Images" in AGENTS.md):
+#   docker build --target base -t deepseek-harness-dsh:base .
+#   docker build -f Dockerfile.dev -t deepseek-harness-dsh:dev .
 RUN apt-get update && apt-get install -y --no-install-recommends \
       bash ca-certificates curl git openssh-client util-linux \
  && rm -rf /var/lib/apt/lists/*
@@ -49,61 +55,14 @@ ARG NPM_REGISTRY=https://registry.npmmirror.com/
 # spawns it with a scrubbed environment, so a user-prefix install is invisible.
 RUN --mount=type=cache,id=npm_cache,target=/root/.npm npm install -g --registry="$NPM_REGISTRY" @deepseek-ai/dsh@0.2.0-rc.2 pnpm@12.10.1
 
-# Bypass the web client's loopback gate: dsh treats a non-loopback page authority
-# (e.g. dsh.example.com) as "remote", which leaves the settings page in memory-only
-# mode. Force isLoopbackHostname to always answer true so settings work over the
-# LAN, and drop the desktop-only "open configuration file" action (xdg-open is
-# absent in the container, so it only ever errors).
-# Also stop the phone zooming: iOS ignores the viewport keys, so touch-action takes
-# the pinch and a 16px :read-write floor keeps WebKit out of its focus zoom.
-# The icon step fits the whale to the iOS home screen. iOS's Dark-icon pass only
-# darkens opaque pixels, so the published black-on-transparent SVG never looked
-# like it changed with the appearance: this gives it the brand-blue tile with the
-# whale knocked out, an app-icon viewBox, and a 1024px intrinsic size (a 50px
-# bitmap scaled up is visibly soft). Each substitution is anchored to its own
-# element, so the tile cannot be repainted or resized whatever order they run in.
-# Phones have no Shift key, so Enter must not send there: the App inserts a
-# newline and sends from its button. On a coarse pointer the guard inserts the
-# break through the desktop path's command and preventDefaults, rather than
-# letting Lexical's plain-text handler defer to the browser — that round trip lets
-# the DOM caret drag the model back. The slash/@ menu, Ctrl/Cmd+Enter and the
-# queued-row editor keep their behaviour.
-# Known iOS/WebKit limitation: the caret mark can stay on the previous line after
-# a newline until the composer scrolls. The insertion point is still correct —
-# typing lands on the new line and the draft text stays "…\n".
-# The guards below count both anchors and pin the bundler's generated line-break
-# symbol, so a dsh bump fails the build instead of shipping code that throws.
-RUN base="$(npm root -g)/@deepseek-ai/dsh/node_modules/@deepseek-ai" \
- && f="$base/dsh-client-connection/lib/client.js" \
- && sed -i 's/if (hostname === "localhost" || hostname === "\[::1\]")//' "$f" \
- && ! grep -Fq 'if (hostname === "localhost"' "$f" \
- && g="$base/dsh-client-ui-settings-general/lib/client.js" \
- && sed -i 's/const documentController = .*/const documentController = void 0;/' "$g" \
- && ! grep -Fq 'new SettingsDocumentStore' "$g" \
- && h="$base/dsh-web-frontend/dist/index.html" \
- && sed -i 's#</head>#<style>@media(pointer:coarse){html{touch-action:pan-x pan-y}select,:read-write:not(.xterm-helper-textarea){font-size:max(16px,1em)!important}}</style></head>#' "$h" \
- && grep -Fq 'max(16px,1em)' "$h" \
- && fav="$base/dsh-web-frontend/dist/favicon.svg" \
- && sed -i -E \
-      -e 's@(<path[^>]*)fill="#[0-9A-Fa-f]{3,6}"@\1fill="#FFFFFF"@' \
-      -e 's@(<svg[^>]*)viewBox="[^"]*"@\1viewBox="-7.83 -7.83 66 66"@' \
-      -e 's@(<svg[^>]*)width="[0-9.]+" height="[0-9.]+"@\1width="1024" height="1024"@' \
-      -e 's@<path@<rect x="-7.83" y="-7.83" width="66" height="66" fill="#4D6BFE"/><path@' \
-      "$fav" \
- && grep -Eq 'width="1024" height="1024" viewBox="-7.83 -7.83 66 66"' "$fav" \
- && grep -Eq '<rect[^>]*fill="#4D6BFE"/><path[^>]*fill="#FFFFFF"' "$fav" \
- && conv="$base/dsh-client-ui-conversation/lib/client.js" \
- && [ "$(grep -Pc '^\t\t\t\tevent\?\.preventDefault\(\);$' "$conv")" = 1 ] \
- && [ "$(grep -Fc 'event.nativeEvent.isComposing) return;' "$conv")" = 1 ] \
- && grep -Pq 'Ue\$2 = [^,;]{0,60}"INSERT_LINE_BREAK_COMMAND"' "$conv" \
- && sed -i \
-      -e 's#^\t\t\t\tevent?.preventDefault();$#\t\t\t\tif (event !== null \&\& !event.ctrlKey \&\& !event.metaKey \&\& window.matchMedia("(pointer: coarse)").matches) {\n\t\t\t\t\tif (!editor.dispatchCommand(Ue$2, false)) return false;\n\t\t\t\t\tevent.preventDefault();\n\t\t\t\t\treturn true;\n\t\t\t\t}\n&#' \
-      -e 's#event.nativeEvent.isComposing) return;#event.nativeEvent.isComposing || window.matchMedia("(pointer: coarse)").matches) return;#' \
-      "$conv" \
- && grep -Pzoq 'window\.matchMedia\("\(pointer: coarse\)"\)\.matches\) \{\n\t\t\t\t\tif \(!editor\.dispatchCommand\(Ue\$2, false\)\) return false;\n\t\t\t\t\tevent\.preventDefault\(\);' "$conv" \
- && grep -Fq 'event.nativeEvent.isComposing || window.matchMedia("(pointer: coarse)").matches) return;' "$conv"
+# This image used to patch dsh's installed JavaScript here: the loopback gate the
+# settings page hides behind, the touch CSS, the home-screen icon, and the composer's
+# Enter key. All of that lives in packages/ now, published separately, so the runtime in here is an
+# untouched dsh, and entrypoint.sh only hands a fresh deployment the profile baked at the end of
+# this file.
 
 COPY --chmod=755 entrypoint.sh /entrypoint.sh
+COPY --chmod=755 tools/ /opt/dsh/tools/
 
 # Deliberately no USER here: the container starts as root so entrypoint.sh can
 # re-point `app` to PUID/PGID and fix ownership, then it drops to that uid with
@@ -117,3 +76,20 @@ WORKDIR /app
 EXPOSE 3080
 
 ENTRYPOINT ["/entrypoint.sh"]
+
+# The published image: this base plus the profile it bakes — dsh's own `web` template and the
+# packages this repository publishes, installed by name from the registry, exactly as `dsh plugin
+# add` would. Strict on purpose: a release that cannot ship its own plugins is not a release.
+# Dockerfile.dev bakes the same profile from packages/ instead; the closing test pins the path
+# entrypoint.sh copies from, and renovate.json reads the version off that line.
+FROM base
+
+# An ARG declared in the base stage is out of scope here, so the registry has to be declared again.
+ARG NPM_REGISTRY=https://registry.npmmirror.com/
+
+RUN mkdir -p /opt/dsh/home \
+ && export HOME=/opt/dsh/home \
+ && printf 'registry=%s\n' "$NPM_REGISTRY" > "$HOME/.npmrc" \
+ && dsh web --dump-config >/dev/null \
+ && dsh plugin --profile web add @idsh/remote-access@0.1.0 \
+ && test -f /opt/dsh/home/.dsh/profiles/web/package.json

@@ -131,18 +131,14 @@ done
 CRED="$HOME/.dsh/.credentials.yaml"
 [ -f "$CRED" ] && chmod 600 "$CRED"
 
-# dsh refuses `--host 0.0.0.0` on the CLI, but the webserver config accepts it.
-# Bind all interfaces so the web UI is reachable directly from the LAN.
-cat > /tmp/webserver.yml <<'EOF'
-- id: webserver
-  config:
-    host: 0.0.0.0
-    port: 3080
-EOF
-
-# The process we exec below runs as PUID, so hand it the file (umask left it
-# 600 root:root).
-chown "$PUID:$PGID" /tmp/webserver.yml
+# Binding every interface — what makes the Web UI reachable from another machine — is
+# done by @idsh/remote-access, not here. dsh refuses `--host 0.0.0.0` on the command line
+# on purpose, so a config layer is the only way to ask, and the package is that layer:
+# installed into the profile below, it lands under any `--patch` or profile patch, and its
+# `!!js` fallbacks keep `--host` and `--port` winning. This image used to carry its own
+# overlay for it, which shadowed the package and had to be kept in sync; with the package
+# absent — a profile that never had it, or one where it was removed — the server keeps
+# dsh's shipped loopback bind.
 
 # The browser-trust fence rejects API requests whose Host is not loopback or a
 # trusted host. DSH_TRUSTED_HOSTS is a space-separated list of authorities
@@ -153,7 +149,30 @@ for h in ${DSH_TRUSTED_HOSTS:-}; do
   set -- "$@" --trusted-host "$h"
 done
 
+# The profile the image baked goes to a deployment that has none. An existing one keeps the packages
+# the image declares: anything missing, broken or behind the image's version is put in place as the
+# image installed it, and anything at that version or above — a pin, a fork, a link into a mounted
+# checkout — is left alone. No boot downloads anything. Disabling is dropping a package from the
+# bundle list, not uninstalling it; nothing is ever removed, and nothing here names a package.
+profile="$HOME/.dsh/profiles/web"
+if [ ! -d "$profile" ] && [ -d /opt/dsh/home/.dsh/profiles/web ]; then
+  mkdir -p "$HOME/.dsh/profiles"
+  cp -a /opt/dsh/home/.dsh/profiles/web "$HOME/.dsh/profiles/"
+  chown -R "$PUID:$PGID" "$profile"
+elif [ -d "$profile" ] && [ ! -f "$profile/package.json" ]; then
+  # Half-initialised: fill it in place, or the copy above would nest itself one level down.
+  cp -a /opt/dsh/home/.dsh/profiles/web/. "$profile/"
+  chown -R "$PUID:$PGID" "$profile"
+elif [ -d /opt/dsh/home/.dsh/profiles/web/node_modules ]; then
+  # Ownership is fixed whatever the script did: it replaces packages one at a time as root, so a
+  # failure halfway through would otherwise leave the ones already swapped in root-owned.
+  node /opt/dsh/tools/sync-companions.mts ||
+    echo "entrypoint: could not repair the companion packages" >&2
+  chown -R "$PUID:$PGID" "$HOME/.dsh/profiles/web" ||
+    echo "entrypoint: could not fix the profile ownership" >&2
+fi
+
 # Drop privileges before exec: dsh and everything it spawns must run as the host
 # user, so files written into the bind mounts belong to the host user.
 exec setpriv --reuid="$PUID" --regid="$PGID" --clear-groups \
-  node --expose-internals "$(command -v dsh)" --profile web --patch /tmp/webserver.yml --no-open "$@"
+  node --expose-internals "$(command -v dsh)" --profile web --no-open "$@"
