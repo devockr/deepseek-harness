@@ -9,5 +9,8 @@
   "scripts": {
     "pack": "pnpm --recursive pack",
     "publish": "pnpm --recursive publish --access public"
+  },
+  "devDependencies": {
+    "playwright": "^1.64.0"
   }
 }
