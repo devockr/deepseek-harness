@@ -187,7 +187,10 @@ const browser = await chromium.launch({
   env: { ...process.env, http_proxy: '', https_proxy: '', all_proxy: '', HTTP_PROXY: '', HTTPS_PROXY: '', ALL_PROXY: '' },
   args: ['--no-sandbox', '--disable-dev-shm-usage', '--no-proxy-server'],
 })
-const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+// A phone, when that is the point: `hasTouch` is what makes `(pointer: coarse)` match,
+// which is the condition every touch behaviour here hangs off.
+const PHONE = { hasTouch: true, isMobile: true, deviceScaleFactor: 3, viewport: { width: 390, height: 844 } }
+const page = await browser.newPage(SCENARIO === 'mobile' ? PHONE : { viewport: { width: 1280, height: 900 } })
 const problems = []
 // Everything, not just errors: cordis reports an unmet `inject` as a warning the
 // boot audit later summarizes as a bare "failed".
@@ -262,6 +265,49 @@ try {
     await page.waitForTimeout(5_000)
     process.stdout.write(`after reload : ${JSON.stringify(await themeState())}\n`)
     await page.screenshot({ path: join(SHOTS, `${SHOT}-after-reload.png`) })
+  }
+
+  // Touch behaviours: coarse-pointer CSS, and Enter meaning "line break" rather than
+  // "send". Both are asserted where they act — computed styles and dispatched events in
+  // the real page — not by reading the plugin's own source back.
+  if (SCENARIO === 'mobile') {
+    const probe = await page.evaluate(() => {
+      const input = document.createElement('input')
+      document.body.append(input)
+      const css = {
+        touchAction: getComputedStyle(document.documentElement).touchAction,
+        inputFontSize: getComputedStyle(input).fontSize,
+      }
+      input.remove()
+
+      // A plain Enter inside an editable must arrive as a shifted one, and must not reach
+      // the document in its original form: the recorder sits in the bubble phase, the
+      // plugin's rewrite in the capture phase.
+      const seen = []
+      const record = (e) => seen.push(`${e.key}${e.shiftKey ? '+shift' : ''}`)
+      document.addEventListener('keydown', record)
+      const editable = document.createElement('div')
+      editable.setAttribute('contenteditable', 'true')
+      editable.style.cssText = 'position:fixed;left:-9999px;top:0'
+      document.body.append(editable)
+      editable.focus()
+      editable.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true }),
+      )
+      document.removeEventListener('keydown', record)
+      editable.remove()
+
+      return {
+        coarse: matchMedia('(pointer: coarse)').matches,
+        css,
+        enterEvents: seen,
+        composerEditables: document.querySelectorAll('[contenteditable="true"]').length,
+        marker: document.body.dataset.idshMobile,
+        appleTouchIcon: !!document.querySelector('link[rel="apple-touch-icon"]'),
+      }
+    })
+    process.stdout.write(`mobile probe : ${JSON.stringify(probe)}\n`)
+    await page.screenshot({ path: join(SHOTS, `${SHOT}-mobile.png`) })
   }
 
   const facts = await page.evaluate(() => ({
