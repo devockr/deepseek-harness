@@ -44,8 +44,8 @@ Inside the container of this repository:
 docker exec -u app -e HOME=/home/app dsh dsh plugin --profile web add @idsh/remote-access
 ```
 
-The image's `entrypoint.sh` already passes a `webserver` overlay of its own, so for
-that container only the heartbeat half of this bundle is new.
+That image installs this package on first boot rather than carrying an overlay of its
+own, so both halves come from here.
 
 ## Where this fits
 
@@ -66,13 +66,10 @@ peer range (the `--remote-auth` / `--allow-remote-privileged` surfaces its launc
 contract wants are not part of the `0.2.x` web app either).
 
 **The connection has to survive the distance.** This is the half the package was
-written for. The Remote mux is one long-lived WebSocket, and the shipped heartbeat
-gives it roughly 4-6 seconds of slack before the Host terminates it. That is fine
-across a desk; over a long-distance path it is not — a Wi-Fi roam, a GC pause, a
-route flap or a proxy hiccup is enough to drop the UI and force a reconnect. The
-30-second interval here came out of exactly that: a `dsh web` deployment reached
-over the public internet from another city, where a few seconds of stall on the way
-was making the UI drop for no real reason.
+written for: the mux is one long-lived WebSocket, and the shipped heartbeat gives it so
+little slack that a Wi-Fi roam, a GC pause, a route flap or a proxy hiccup drops the UI
+for no real reason. The 30-second interval came out of exactly that — a `dsh web`
+deployment reached over the public internet from another city.
 
 
 ## A side effect worth knowing: the directory picker
@@ -136,8 +133,9 @@ values does not have to change or remove this package:
 
 ## Trade-offs
 
-- A socket that is truly dead is noticed up to one interval later, so a reconnect
-  after a real drop starts later than it would on the default.
+- A socket that is truly dead is noticed later: roughly 4-6s after the last ping on the
+  shipped 2000ms interval, roughly 60-90s here (2 missed pings at 30s). A reconnect after
+  a real drop therefore starts later than it would on the default.
 - Ping volume is unchanged in kind and negligible either way: one control frame
   per open socket per interval.
 - 30000 is a deliberate middle: it absorbs the seconds-long stalls a long-distance or

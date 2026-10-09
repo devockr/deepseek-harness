@@ -30,8 +30,7 @@ Dockerized [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (
    own hostnames, LAN addresses and proxy settings, which do not belong in a
    published repository.
 
-   The template mounts only dsh's own state. Add the mounts you want — a
-   workspace, an ssh config — as described under Ports and volumes.
+   The template mounts only dsh's own state; add what you want (see Ports and volumes).
 
 3. Grab the one-time token from the logs:
 
@@ -45,6 +44,16 @@ Dockerized [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (
    ```
    http://<host>:15080/?token=<token>
    ```
+
+The image bakes [`@idsh/remote-access`](packages/remote-access/) into a fresh profile, which binds
+the server to every interface — that is what makes the published port work at all, since a listener
+on `127.0.0.1` *inside* the container cannot receive a connection forwarded to its address. It also
+means every LAN address reaches the UI once the port is published; read that package's security notes
+first. To keep the server on loopback instead, **disable** the package — the UI's Plugins page, or
+dropping it from `dsh.profile.bundles` — rather than uninstalling it, since a package the image
+declares is put back on the next start; or patch the host back to `127.0.0.1`.
+Either way, reach dsh through the container's own network namespace (`docker exec`, or
+`docker run --network container:dsh`), because a published port will no longer carry it.
 
 The token rotates on every restart.
 
@@ -60,13 +69,11 @@ Environment variables (see `docker-compose.example.yml`):
 | `DSH_TRUSTED_HOSTS` | Space-separated host authorities allowed by dsh's browser-trust fence | `dsh.example.com` |
 | `http_proxy` / `https_proxy` / `all_proxy` / `no_proxy` | Outbound proxy for dsh's HTTP requests | — |
 
-The registry is written into the user-level `~/.npmrc`, `~/.yarnrc` and
-`~/.yarnrc.yml` at boot, and corepack's and node-gyp's mirrors follow it. It lives in
-those files rather than in the environment so a project that pins its own registry
-still wins; `NPM_CONFIG_REGISTRY` and `YARN_NPM_REGISTRY_SERVER` are therefore **not
-read**, and an old compose file that still sets one should drop it. Variables with no
-default are passed through from your shell or `.env` by name, so an unset one is left
-unset rather than injected empty.
+At boot the registry is written into `~/.npmrc`, `~/.yarnrc` and `~/.yarnrc.yml` (corepack
+and node-gyp mirrors follow), not into the environment — so a project that pins its own
+registry still wins. `NPM_CONFIG_REGISTRY` and `YARN_NPM_REGISTRY_SERVER` are therefore
+**not read**; drop them from old compose files. Variables with no default are passed through
+by name, so an unset one stays unset rather than becoming empty.
 
 Ports and volumes:
 
@@ -88,7 +95,6 @@ Ports and volumes:
   invocations. Extra `docker run <image> <args>` are appended after dsh's web
   flags, so they can't override `--profile web`.
 - **Sandbox** — dsh's file sandbox needs user namespaces or Landlock. On hosts without them (e.g. Synology's 4.4 kernel), either set `DSH_PERMISSION_MODE=danger-full-access`, or approve the `danger-full-access` escalation when prompted in the UI.
-- **Settings page** — dsh gates the Models/settings page behind a client-side loopback check. The `Dockerfile` patches that check in the installed bundle, so the page loads over the LAN and settings persist durably (no SSH tunnel needed).
-- **Enter on a phone** — stock dsh sends on Enter, which leaves touch devices with no way to insert a newline (no Shift key). The `Dockerfile` patches the composer so Enter inserts a newline there and the send button sends, matching the app. Known iOS quirk: the blinking caret mark can stay on the previous line after a newline until the composer scrolls; the insertion point itself is correct, so typed text lands on the new line.
-- **Plugins** — the image installs pnpm (which `dsh plugin` drives), so plugins can be added from the web UI's plugin manager or the CLI, e.g. `docker exec -u app -e HOME=/home/app dsh dsh plugin --profile web add <pkg>` (HOME has to be passed along). Plugins live in the `.dsh` bind mount, so they survive recreations but are not part of the image. This repository also publishes its own companion plugins from the [`packages/`](packages/) pnpm workspace — see [`@idsh/remote-access`](packages/remote-access/).
+- **Plugins** — the image bakes a profile when it is built: dsh's own `web` template plus its companion package, [`@idsh/remote-access`](packages/remote-access/), installed from npm by name (the dev image, what we run locally, bakes this checkout's `packages/` as a `link:` instead). A deployment without a profile starts from that one; an existing profile keeps those packages at the version the image declares — compared by each package's own `package.json` — putting back anything missing, broken or below it, exactly as the image installed it (a link in the dev image, where a checkout mounted at `/opt/dsh/packages` is then edited live; files otherwise). Anything at that version or above is left alone, which is where a pinned version or a fork lives, and a package is turned off by dropping it from the bundle list (the UI's Plugins page), not by uninstalling it. Plugins live in the `.dsh` mount and survive recreations.
+- **Remote exposure** — [`@idsh/remote-access`](packages/remote-access/) binds the UI to every interface, which also puts every LAN address into dsh's browser-trust fence. Put TLS and auth (or a VPN) in front unless that network is trusted; see that package's README.
 - **HTTPS reverse proxy** — if you front this with nginx, keep the `Host` header intact (`proxy_set_header Host $http_host;`) so the browser-trust fence passes, and add WebSocket upgrade headers.
