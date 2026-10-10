@@ -6,4 +6,4 @@
 export const name = '@idsh/mobile'
 
 /** Nothing to do on the host: no service, no config, no state. */
-export function apply() {}
+export function apply(): void {}

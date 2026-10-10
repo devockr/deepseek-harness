@@ -14,11 +14,29 @@
 //
 // This is deliberately an exception to a designed boundary. Read the package README
 // before installing it.
+interface Window {
+  __ModuleLoader__: {
+    load(module: { id: string; factory: () => unknown }): void
+  }
+}
+
+interface PluginExports {
+  name?: string
+  inject?: string[]
+  apply?: (ctx: PluginContext) => void
+}
+
+interface PluginContext {
+  connection?: { isLoopback?: boolean }
+  remote?: { $host?: { isLoopback?: boolean } }
+  on(event: 'dispose', handler: () => void): void
+}
+
 window.__ModuleLoader__.load({
   id: '@idsh/privileged-ui',
-  factory: (require) => {
-    var module = { exports: {} }
-    var exports = module.exports
+  factory: () => {
+    const module: { exports: PluginExports } = { exports: {} }
+    const exports = module.exports
     Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' })
 
     const MARK = 'idshPrivileged'
@@ -26,7 +44,7 @@ window.__ModuleLoader__.load({
     // A one-glance marker and a console line: the image's build-time patch fails the
     // build when dsh moves, and a runtime patch has to fail just as loudly instead of
     // rotting quietly. `document.body.dataset.idshPrivileged` is the whole report.
-    function mark(state) {
+    function mark(state: string): void {
       try {
         document.body.dataset[MARK] = state
       } catch {}
@@ -38,17 +56,17 @@ window.__ModuleLoader__.load({
     // service it did not inject — that throw is what made the first version inactive.
     exports.inject = ['connection', 'remote']
 
-    function apply(ctx) {
+    function apply(ctx: PluginContext): void {
       const connection = ctx.connection
       const before = connection?.isLoopback
-      if (typeof before !== 'boolean') {
+      if (connection === undefined || typeof before !== 'boolean') {
         mark('SELF-CHECK-FAILED connection.isLoopback is ' + typeof before)
         return
       }
       try {
         connection.isLoopback = true
       } catch (error) {
-        mark('SELF-CHECK-FAILED not writable: ' + error.message)
+        mark('SELF-CHECK-FAILED not writable: ' + (error as Error).message)
         return
       }
       // Whether the consumers can see this depends on when they read it: the gateway

@@ -4,11 +4,31 @@
 // files at build time: two CSS rules injected into dist/index.html, a rewritten
 // dist/favicon.svg, and a sed-injected branch inside the composer's keydown handler.
 // Doing them here means the image can ship an untouched dsh and install a package.
+interface Window {
+  __ModuleLoader__: {
+    load(module: { id: string; factory: () => unknown }): void
+  }
+}
+
+interface Disposable {
+  (): void
+}
+
+interface PluginExports {
+  name?: string
+  inject?: string[]
+  apply?: (ctx: PluginContext) => void
+}
+
+interface PluginContext {
+  on(event: 'dispose', handler: () => void): void
+}
+
 window.__ModuleLoader__.load({
   id: '@idsh/mobile',
-  factory: (require) => {
-    var module = { exports: {} }
-    var exports = module.exports
+  factory: () => {
+    const module: { exports: PluginExports } = { exports: {} }
+    const exports = module.exports
     Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' })
 
     exports.name = '@idsh/mobile'
@@ -16,7 +36,7 @@ window.__ModuleLoader__.load({
 
     // One-glance state for the probe and for anyone with DevTools open.
     let state = 'starting'
-    function mark(extra) {
+    function mark(extra?: string): void {
       state = extra === undefined ? state : extra
       try {
         document.body.dataset.idshMobile = state
@@ -33,7 +53,7 @@ window.__ModuleLoader__.load({
       '@media(pointer:coarse){html{touch-action:pan-x pan-y}' +
       'select,:read-write:not(.xterm-helper-textarea){font-size:max(16px,1em)!important}}'
 
-    function injectCss() {
+    function injectCss(): Disposable {
       const style = document.createElement('style')
       style.dataset.idshMobile = 'css'
       style.textContent = CSS
@@ -47,19 +67,18 @@ window.__ModuleLoader__.load({
      * Stock behaviour is `event.key === "Enter" && !event.shiftKey` → send, and a shifted
      * Enter runs the editor's own line-break command. So the plain key is turned into a
      * shifted one in the capture phase, and the original is stopped before the composer's
-     * handler ever sees it. That also means it composes with the image's own patch rather
-     * than doubling it: there, the patched handler never receives the plain Enter either.
+     * handler ever sees it.
      */
-    function rewriteEnterOnCoarsePointers() {
-      const onKeydown = (event) => {
+    function rewriteEnterOnCoarsePointers(): Disposable {
+      const onKeydown = (event: KeyboardEvent): void => {
         if (event.key !== 'Enter' || event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return
         if (event.isComposing || event.keyCode === 229) return // mid-IME
         if (!window.matchMedia('(pointer: coarse)').matches) return
         const target = event.target
         if (!(target instanceof Element)) return
         // Only the composer's own editor: the same rewrite on a plain input (the session
-        // search) or the terminal's textarea would break them, and the patch this replaces lived
-        // inside the composer's handler, so that is the scope it had.
+        // search) or the terminal's textarea would break them, and the patch this replaces
+        // lived inside the composer's handler, so that is the scope it had.
         const editable = target.closest('[contenteditable="true"]')
         if (editable === null) return
         event.stopPropagation()
@@ -89,7 +108,7 @@ window.__ModuleLoader__.load({
      * Not verified on a real iOS device — the claim is only that the transformed icon is
      * offered as an apple-touch-icon, which is what the image's favicon rewrite relied on.
      */
-    async function rewriteHomeScreenIcon() {
+    async function rewriteHomeScreenIcon(): Promise<Disposable> {
       const link = document.querySelector('link[rel~="icon"]')
       if (!(link instanceof HTMLLinkElement)) return () => {}
       const source = await (await fetch(link.href)).text()
@@ -106,8 +125,8 @@ window.__ModuleLoader__.load({
       return () => icon.remove()
     }
 
-    function apply(ctx) {
-      const teardown = [injectCss(), rewriteEnterOnCoarsePointers()]
+    function apply(ctx: PluginContext): void {
+      const teardown: Disposable[] = [injectCss(), rewriteEnterOnCoarsePointers()]
       let disposed = false
       mark('css+enter coarse:' + window.matchMedia('(pointer: coarse)').matches)
       rewriteHomeScreenIcon()
@@ -121,7 +140,7 @@ window.__ModuleLoader__.load({
           teardown.push(off)
           mark(state + ' icon:ok')
         })
-        .catch((error) => mark(state + ' icon:' + error.message))
+        .catch((error: unknown) => mark(state + ' icon:' + (error as Error).message))
       ctx.on('dispose', () => {
         disposed = true
         for (const off of teardown) {

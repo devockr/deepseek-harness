@@ -15,8 +15,5 @@ docker-compose.yml
 id_rsa
 id_ed25519
 
-# dsh packages build into lib/, which a global gitignore commonly excludes. The
-# companion packages' bundles are hand-written source, not build output, so they are
-# kept — and the exception has to live here, since a global rule is invisible to
-# everyone else.
-!packages/*/lib/
+# dsh packages compile src/ into lib/, and lib/ is what ships — build output, not source.
+packages/*/lib/

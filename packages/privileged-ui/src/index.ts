@@ -6,4 +6,4 @@
 export const name = '@idsh/privileged-ui'
 
 /** Nothing to do on the host: no service, no config, no state. */
-export function apply() {}
+export function apply(): void {}

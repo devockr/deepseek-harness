@@ -109,8 +109,12 @@ Observe the running thing; do not reason from source.
 
 ## Packages under `packages/`
 
-- Layout: `package.json` (`dsh.bundle.patch`, plus `dsh.client` for a browser half),
-  `cordis.patch.yml`, `lib/`, `README.md`; npm scope `@idsh`.
+- Layout: `src/index.ts` for the host half and, when there is a browser half, `src/client.ts`
+  — a plain script with no imports, because dsh serves exactly one file per package —
+  compiled by `tsc` into `lib/`, which is what `main`/`exports`/`files` name and what ships;
+  `cordis.patch.yml`, `README.md`; npm scope `@idsh`.
+- **`lib/` is build output**: gitignored, produced by `pnpm --recursive build` — the dev image
+  runs that after COPYing `packages/`, and without it a `link:` target has nothing to load.
 - A patch **replaces the row's whole `config`** — restate every key that should survive.
 - Patch YAML takes `#` comments only; `//` fails validation and the install rolls back.
 - `link:` dogfoods from source; `file:` copies.

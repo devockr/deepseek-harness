@@ -18,6 +18,10 @@
     "url": "git+https://github.com/devockr/deepseek-harness.git",
     "directory": "packages/mobile"
   },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepack": "pnpm run build"
+  },
   "main": "lib/index.js",
   "files": [
     "lib/index.js",
