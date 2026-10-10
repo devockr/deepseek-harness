@@ -16,6 +16,19 @@
         "(?<depName>@?[^\\s@\\\\]+)@(?<currentValue>[^\\s\\\\]+)"
       ],
       "datasourceTemplate": "npm"
+    },
+    {
+      "customType": "regex",
+      "description": "Keep the plugin versions baked into the images up to date; one or several packages per `dsh plugin add` are read",
+      "managerFilePatterns": [
+        "/(^|/)Dockerfile(\\.test)?$/"
+      ],
+      "matchStringsStrategy": "recursive",
+      "matchStrings": [
+        "dsh plugin --profile web add (?:\\\\\\n|[^\\n&])+",
+        "(?<depName>@?[^\\s@\\\\]+)@(?<currentValue>[^\\s\\\\]+)"
+      ],
+      "datasourceTemplate": "npm"
     }
   ]
 }

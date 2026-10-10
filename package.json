@@ -1,0 +1,13 @@
+{
+  "name": "deepseek-harness-plugins",
+  "private": true,
+  "description": "Companion dsh plugins for the container image in this repository",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "pack": "pnpm --recursive pack",
+    "publish": "pnpm --recursive publish --access public"
+  }
+}

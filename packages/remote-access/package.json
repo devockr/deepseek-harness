@@ -1,0 +1,37 @@
+{
+  "name": "@idsh/remote-access",
+  "version": "0.1.0",
+  "description": "Reach a dsh Web profile from another machine: bind every interface and keep the UI's Remote-mux WebSocket alive across a flaky or proxied link",
+  "license": "MIT",
+  "type": "module",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "cordis",
+    "bundle",
+    "lan",
+    "remote",
+    "websocket",
+    "heartbeat"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/devockr/deepseek-harness.git",
+    "directory": "packages/remote-access"
+  },
+  "files": [
+    "cordis.patch.yml"
+  ],
+  "exports": {
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

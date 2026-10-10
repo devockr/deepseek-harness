@@ -1,14 +1,7 @@
-# Deny by default.
-#
-# The build context needs exactly one file: entrypoint.sh — the only COPY in the
-# Dockerfile (every other step is apt/npm and reads nothing from the tree).
-# Nothing else enters the context, so nothing that lives beside the tracked files
-# can ride along by accident: local state, private notes and repository metadata
-# are all covered by the `*` below. Listing them as extra rules would be dead
-# config — they are excluded, not re-excluded.
-#
-# When a new COPY is introduced, whitelist it here. Until then the build fails
-# loudly ("failed to compute cache key: ... not found") rather than silently
-# shipping a context you did not intend.
+# Deny by default — this file is for the published image (`Dockerfile`), whose COPYs are
+# entrypoint.sh and tools/. Everything else, including the packages/ tree that only the dev image
+# needs, is covered by the `*`. Dockerfile.dev has its own ignore file, so neither build carries the
+# other's content: whitelist a new COPY here or the build fails loudly.
 *
 !entrypoint.sh
+!tools/

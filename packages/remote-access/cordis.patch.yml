@@ -1,0 +1,31 @@
+# Bundle layer: applied after every bundle in `dsh.profile.bundles` and below the
+# profile's own cordis.patch.yml, $DSH_HOME/cordis.patch.yml and any --patch
+# overlay — so a deployment that wants another value overrides it there instead
+# of forking this package.
+#
+# A patch replaces the targeted row's whole `config`, so every key the row owns is
+# restated here. Only the two fallbacks differ from the shipped row, and the `!!js`
+# expressions are kept, so `--port` — and an explicit `--host 127.0.0.1` — still win.
+- id: webserver
+  name: "@deepseek-ai/dsh-host-webserver"
+  config:
+    # Shipped default: 127.0.0.1. Binding every interface is what makes the Web UI
+    # reachable from another machine, and dsh refuses `--host 0.0.0.0` on the
+    # command line on purpose — a config layer is the only way to ask for it.
+    host: !!js ctx.webStartup.host ?? '0.0.0.0'
+    port: !!js ctx.webStartup.port ?? 3080
+    compression: gzip
+    compressionLevel: 1
+    compressionThresholdBytes: 1024
+
+# The Web UI talks to the Host over one multiplexed WebSocket (`/api/remote.mux`).
+# typert-gateway is the entry id @deepseek-ai/dsh-api-gateway carries in the
+# dsh-base bundle; the `name` assertion keeps this entry pointed at that plugin.
+- id: typert-gateway
+  name: "@deepseek-ai/dsh-api-gateway"
+  config:
+    # Default 2000. The Host pings at this interval and terminates a socket that
+    # has missed MAX_MISSED_HEARTBEATS (2) of them, so the default tolerates only
+    # ~4-6s of network stall before the UI's mux socket dies and the client
+    # reconnects; 30000 tolerates ~60-90s.
+    websocketHeartbeatIntervalMs: 30000

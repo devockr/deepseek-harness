@@ -1,0 +1,7 @@
+# Deny by default — this file is for the dev image (`Dockerfile.dev`), which COPYes packages/ and
+# nothing else: the rest of the base comes from Dockerfile's `base` target. The Dockerfile itself
+# is whitelisted because BuildKit reads `-f <file>` from the context when it lives inside it.
+*
+!packages/
+packages/*/node_modules
+!Dockerfile.dev

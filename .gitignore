@@ -2,6 +2,8 @@
 .dsh
 # Private notes kept in the working directory.
 .tasks
+# pnpm workspace install for the companion plugins under packages/.
+node_modules
 
 # The real compose file is the machine-specific copy; the tracked template is
 # docker-compose.example.yml. Hostnames, LAN addresses and proxy settings in it
