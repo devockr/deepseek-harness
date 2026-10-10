@@ -57,8 +57,10 @@ RUN mkdir -p /opt/dsh/home \
     done \
  && test -f /opt/dsh/home/.dsh/profiles/web/package.json
 
+# The libraries the headless shell needs, plus a font and fontconfig's own configuration:
+# without them Skia aborts the renderer the first time a page shapes text, which is every page.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       libatk-bridge2.0-0 libgbm1 libxrandr2 libxcomposite1 libxdamage1 libxfixes3 \
-      libxkbcommon0 libnss3 libasound2 \
+      libxkbcommon0 libnss3 libasound2 fonts-liberation fontconfig \
  && rm -rf /var/lib/apt/lists/*
 
