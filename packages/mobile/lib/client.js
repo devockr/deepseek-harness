@@ -57,7 +57,10 @@ window.__ModuleLoader__.load({
         if (!window.matchMedia('(pointer: coarse)').matches) return
         const target = event.target
         if (!(target instanceof Element)) return
-        const editable = target.closest('[contenteditable="true"], textarea, input')
+        // Only the composer's own editor: the same rewrite on a plain input (the session
+        // search) or the terminal's textarea would break them, and the patch this replaces lived
+        // inside the composer's handler, so that is the scope it had.
+        const editable = target.closest('[contenteditable="true"]')
         if (editable === null) return
         event.stopPropagation()
         event.preventDefault()
@@ -105,14 +108,22 @@ window.__ModuleLoader__.load({
 
     function apply(ctx) {
       const teardown = [injectCss(), rewriteEnterOnCoarsePointers()]
+      let disposed = false
       mark('css+enter coarse:' + window.matchMedia('(pointer: coarse)').matches)
       rewriteHomeScreenIcon()
         .then((off) => {
+          // The icon arrives a fetch later, so a dispose that already happened has to undo it
+          // here: the teardown list was drained and would never see this one.
+          if (disposed) {
+            off()
+            return
+          }
           teardown.push(off)
           mark(state + ' icon:ok')
         })
         .catch((error) => mark(state + ' icon:' + error.message))
       ctx.on('dispose', () => {
+        disposed = true
         for (const off of teardown) {
           try {
             off()

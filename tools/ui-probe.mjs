@@ -27,7 +27,24 @@ import { join } from 'node:path'
 
 const argv = process.argv.slice(2)
 const flag = (name) => argv.includes(name)
-const values = (name) => argv.flatMap((a, i) => (a === name && argv[i + 1] ? [argv[i + 1]] : []))
+/**
+ * Every operand of a repeatable `name`, rejecting an absent one or a following flag: a silently
+ * defaulted `--host` would probe the wrong origin, and an operand that looks like a flag is a typo.
+ */
+const values = (name) => {
+  const found = []
+  for (let index = 0; index < argv.length; index += 1) {
+    if (argv[index] !== name) continue
+    const value = argv[index + 1]
+    if (value === undefined || value.startsWith('-')) throw new Error(`${name} needs a value`)
+    found.push(value)
+    index += 1
+  }
+  return found
+}
+/** The loopback authority, however it is spelled — `localhost` is not a remote origin. */
+const isLoopback = (host) =>
+  host === 'localhost' || host === '::1' || host === '[::1]' || host.startsWith('127.')
 
 const HOME = process.env.PROBE_HOME ?? '/tmp/dsh-ui-probe'
 const SHOTS = process.env.PROBE_SHOTS ?? '/home/app/.dsh/cache/ui-probe'
@@ -42,6 +59,15 @@ const SCENARIO = values('--scenario')[0]
 const DSH = process.env.PROBE_DSH ?? 'dsh'
 // The launcher wants --expose-internals, exactly as entrypoint.sh invokes it.
 const dshArgv = (args) => (DSH.endsWith('.js') ? [process.execPath, ['--expose-internals', DSH, ...args]] : [DSH, args])
+
+// The instance is ours to clean up whatever happens: a rejected boot, a thrown scenario or an
+// early exit all land here, so nothing outlives the probe unless --keep asked for it.
+let child
+process.on('exit', () => {
+  if (KEEP) return
+  child?.kill('SIGTERM')
+  rmSync(HOME, { recursive: true, force: true })
+})
 
 mkdirSync(SHOTS, { recursive: true })
 
@@ -62,7 +88,11 @@ function prepareProfile() {
   for (const spec of INSTALLS) {
     const r = run(['plugin', '--profile', PROFILE, 'add', spec])
     process.stdout.write(`install ${spec}: ${r.status === 0 ? 'ok' : 'FAILED'}\n`)
-    if (r.status !== 0) process.stdout.write(r.stdout + r.stderr)
+    if (r.status !== 0) {
+      // Booting anyway would probe a profile without the plugin the caller asked for, and still
+      // exit 0 — fail here, where the message means something.
+      throw new Error(`could not install ${spec}:\n${r.stdout ?? ''}${r.stderr ?? ''}`)
+    }
   }
 }
 
@@ -79,7 +109,7 @@ function boot() {
   // the first token it does not recognize to the app, so `--patch` must come before
   // `--port`.
   const args = ['--profile', PROFILE]
-  if (HOST !== '127.0.0.1') {
+  if (!isLoopback(HOST)) {
     const patch = join(HOME, 'bind-all-interfaces.patch.yml')
     writeFileSync(
       patch,
@@ -98,21 +128,24 @@ function boot() {
     args.push('--patch', patch)
   }
   args.push('--port', '0', '--no-open')
-  const child = spawn(...dshArgv(args), {
+  child = spawn(...dshArgv(args), {
     env: { ...process.env, DSH_HOME: HOME },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   return new Promise((resolve, reject) => {
     let out = ''
-    const timer = setTimeout(() => reject(new Error(`no readiness line in 60s:\n${out}`)), 60_000)
+    const timer = setTimeout(() => {
+      child.kill('SIGTERM')
+      reject(new Error(`no readiness line in 60s:\n${out}`))
+    }, 60_000)
     const onData = (chunk) => {
       out += chunk
       const m = /dsh web: (https?:\/\/[^\s]+)/.exec(out)
       if (!m) return
       clearTimeout(timer)
       child.stdout.off('data', onData)
-      const url = new URL(HOST === '127.0.0.1' ? m[1] : m[1].replace(/\/\/[^/:]+/, `//${HOST}`))
-      resolve({ url: url.toString(), token: url.searchParams.get('token'), child, out })
+      const url = new URL(isLoopback(HOST) ? m[1] : m[1].replace(/\/\/[^/:]+/, `//${HOST}`))
+      resolve({ url: url.toString(), token: url.searchParams.get('token'), out })
     }
     child.stdout.on('data', onData)
     child.stderr.on('data', (c) => (out += c))
@@ -123,13 +156,14 @@ function boot() {
 const { chromium } = await import('playwright')
 
 prepareProfile()
-const { url, token, child, out } = await boot()
+const { url, token, out } = await boot()
 process.stdout.write(`probe up: ${url.replace(token ?? '', '<token>')}\n`)
 
 // Without a browser the useful half is still available: the served shell carries the
 // composed boot graph, so the plugin rows and their bundle URLs can be checked
 // directly. This is the mode to use where the container has no browser libraries.
 if (flag('--no-browser')) {
+  let failed = false
   const origin = new URL(url).origin
   // The token URL answers 303 and sets the session cookie; the redirect target then
   // needs that cookie. fetch follows redirects but keeps no cookie jar, so a plain
@@ -139,6 +173,7 @@ if (flag('--no-browser')) {
     .map((c) => c.split(';')[0])
     .filter(Boolean)
     .join('; ')
+  if (exchange.status !== 303) failed = true
   process.stdout.write(`token       : ${exchange.status} → cookie ${cookie ? `${cookie.length} bytes` : 'NONE'}\n`)
   const res = await fetch(`${origin}/`, { headers: { cookie } })
   const html = await res.text()
@@ -151,6 +186,7 @@ if (flag('--no-browser')) {
   )
   process.stdout.write(`boot graph  : ${boot ? `${graph.length} bytes` : 'NOT FOUND'}\n`)
   if (!boot) {
+    failed = true
     const at = html.search(/__DSH_BOOT__/)
     process.stdout.write(
       at >= 0
@@ -158,8 +194,15 @@ if (flag('--no-browser')) {
         : `  no __DSH_BOOT__; head: ${JSON.stringify(html.slice(0, 200))}\n`,
     )
   }
-  for (const wanted of ['privileged-ui', 'remote-access']) {
-    process.stdout.write(`contains ${wanted}: ${graph.includes(wanted) ? 'yes' : 'NO'}\n`)
+  // remote-access is a server-side patch with no client half, so its absence from the boot graph
+  // is by design and not an assertion; the two client plugins are.
+  for (const wanted of ['privileged-ui', 'mobile', 'remote-access']) {
+    const expected = wanted !== 'remote-access'
+    const found = graph.includes(wanted)
+    if (expected && !found) failed = true
+    process.stdout.write(
+      `contains ${wanted}: ${found ? 'yes' : 'NO'}${expected ? '' : ' (server half, not in the client graph)'}\n`,
+    )
   }
   // URLs appear both escaped (inside the boot graph) and as plain script attributes.
   const urls = [
@@ -172,11 +215,16 @@ if (flag('--no-browser')) {
   for (const u of urls) {
     const target = u.startsWith('http') ? u : origin + (u.startsWith('/') ? '' : '/') + u
     const res = await fetch(target)
+    if (res.status >= 400) failed = true
     process.stdout.write(`  ${res.status} ${res.headers.get('content-type') ?? ''} ${u}\n`)
   }
-  child.kill('SIGTERM')
-  if (!KEEP) rmSync(HOME, { recursive: true, force: true })
-  process.exit(0)
+  if (!KEEP) {
+    child.kill('SIGTERM')
+    rmSync(HOME, { recursive: true, force: true })
+  } else {
+    process.stdout.write(`kept: ${HOME} (pid ${child.pid})\n`)
+  }
+  process.exit(failed ? 1 : 0)
 }
 
 const browser = await chromium.launch({
@@ -187,9 +235,11 @@ const browser = await chromium.launch({
   env: { ...process.env, http_proxy: '', https_proxy: '', all_proxy: '', HTTP_PROXY: '', HTTPS_PROXY: '', ALL_PROXY: '' },
   args: ['--no-sandbox', '--disable-dev-shm-usage', '--no-proxy-server'],
 })
-// A phone, when that is the point: `hasTouch` is what makes `(pointer: coarse)` match,
-// which is the condition every touch behaviour here hangs off.
-const PHONE = { hasTouch: true, isMobile: true, deviceScaleFactor: 3, viewport: { width: 390, height: 844 } }
+// A phone, when that is the point: `hasTouch` is what makes `(pointer: coarse)` match, which is
+// the condition every touch behaviour here hangs off. `isMobile` is deliberately not set: in the
+// headless shell that emulation path dies in Skia asking fontconfig for fonts the dev image does
+// not carry, and the coarse pointer is what the plugins key off either way.
+const PHONE = { hasTouch: true, viewport: { width: 390, height: 844 } }
 const page = await browser.newPage(SCENARIO === 'mobile' ? PHONE : { viewport: { width: 1280, height: 900 } })
 const problems = []
 // Everything, not just errors: cordis reports an unmet `inject` as a warning the
@@ -270,6 +320,19 @@ try {
   // Touch behaviours: coarse-pointer CSS, and Enter meaning "line break" rather than
   // "send". Both are asserted where they act — computed styles and dispatched events in
   // the real page — not by reading the plugin's own source back.
+  if (SCENARIO === 'discover-composer') {
+    const found = await page.evaluate(() =>
+      [...document.querySelectorAll('[contenteditable="true"], textarea, input')].map((el) => ({
+        tag: el.tagName,
+        inXterm: !!el.closest('.xterm'),
+        attrs: [...el.attributes]
+          .map((a) => `${a.name}=${JSON.stringify(a.value.slice(0, 70))}`)
+          .join(' '),
+      })),
+    )
+    process.stdout.write(`editables:\n${found.map((f) => `  ${JSON.stringify(f)}`).join('\n')}\n`)
+  }
+
   if (SCENARIO === 'mobile') {
     const probe = await page.evaluate(() => {
       const input = document.createElement('input')
@@ -297,10 +360,25 @@ try {
       document.removeEventListener('keydown', record)
       editable.remove()
 
+      // And the other way round: a plain input (the session search) keeps its own Enter.
+      const inputSeen = []
+      const recordInput = (e) => inputSeen.push(`${e.key}${e.shiftKey ? '+shift' : ''}`)
+      document.addEventListener('keydown', recordInput)
+      const search = document.createElement('input')
+      search.style.cssText = 'position:fixed;left:-9999px;top:0'
+      document.body.append(search)
+      search.focus()
+      search.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true }),
+      )
+      document.removeEventListener('keydown', recordInput)
+      search.remove()
+
       return {
         coarse: matchMedia('(pointer: coarse)').matches,
         css,
         enterEvents: seen,
+        inputEvents: inputSeen,
         composerEditables: document.querySelectorAll('[contenteditable="true"]').length,
         marker: document.body.dataset.idshMobile,
         appleTouchIcon: !!document.querySelector('link[rel="apple-touch-icon"]'),
