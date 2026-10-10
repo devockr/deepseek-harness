@@ -41,12 +41,34 @@ FROM ${BASE}
 # An ARG before FROM is only usable in the FROM line, so the registry has to be declared again.
 ARG NPM_REGISTRY=https://registry.npmmirror.com/
 
+# The libraries the headless shell needs, plus a font and fontconfig's own configuration:
+# without them Skia aborts the renderer the first time a page shapes text, which is every page.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libatk-bridge2.0-0 libgbm1 libxrandr2 libxcomposite1 libxdamage1 libxfixes3 \
+      libxkbcommon0 libnss3 libasound2 fonts-liberation fontconfig \
+ && rm -rf /var/lib/apt/lists/*
+
+
 # The same baked profile as the published image, from this checkout instead of the registry. It
 # links rather than copies, so a deployment that mounts a checkout over /opt/dsh/packages runs that
 # source and sees edits immediately.
 # `--chmod` is not decoration: COPY takes the modes from the build context, so a builder with
 # a strict umask would ship them 0600 root:root and the runtime user could not read them.
 COPY --chmod=755 packages/ /opt/dsh/packages/
+# The packages are TypeScript: whatever the bake below links to has to contain the compiled
+# lib/ their manifests name. They are built in a workspace-shaped copy — the workspace file
+# lists packages/*, so the build has to run where that path exists — and the built tree then
+# lands where the profile links to and a deployment mounts.
+WORKDIR /build
+COPY --chmod=755 packages/ ./packages/
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile --ignore-scripts --registry "$NPM_REGISTRY" \
+ && pnpm --recursive --if-present --workspace-concurrency=1 run build \
+ && mkdir -p /opt/dsh/packages \
+ && cp -a packages/. /opt/dsh/packages/ \
+ && rm -rf /build
+WORKDIR /
+
 RUN mkdir -p /opt/dsh/home \
  && export HOME=/opt/dsh/home \
  && printf 'registry=%s\n' "$NPM_REGISTRY" > "$HOME/.npmrc" \
@@ -56,9 +78,4 @@ RUN mkdir -p /opt/dsh/home \
       dsh plugin --profile web add "link:${d%/}"; \
     done \
  && test -f /opt/dsh/home/.dsh/profiles/web/package.json
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      libatk-bridge2.0-0 libgbm1 libxrandr2 libxcomposite1 libxdamage1 libxfixes3 \
-      libxkbcommon0 libnss3 libasound2 \
- && rm -rf /var/lib/apt/lists/*
 
