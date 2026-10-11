@@ -7,7 +7,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "dev": "pnpm build && docker build --target base -t deepseek-harness-dsh:base . && docker build -f Dockerfile.dev -t deepseek-harness-dsh:dev .",
+    "dev": "docker build --target base -t deepseek-harness-dsh:base . && docker build -f Dockerfile.dev -t deepseek-harness-dsh:dev .",
     "build": "pnpm --recursive --if-present --workspace-concurrency=1 run build",
     "pack": "pnpm --recursive pack",
     "publish": "pnpm --recursive publish --access public"

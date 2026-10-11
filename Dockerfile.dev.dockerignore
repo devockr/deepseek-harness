@@ -4,6 +4,7 @@
 *
 !packages/
 packages/*/node_modules
+packages/*/lib
 !Dockerfile.dev
 !package.json
 !pnpm-workspace.yaml

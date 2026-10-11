@@ -63,9 +63,11 @@ tracked `.gitignore` already ignores `.tasks/`.
 | `deepseek-harness-dsh:latest` | `:base` + a profile baked from the registry (strict) | the deployment |
 | `deepseek-harness-dsh:dev` | `:base` + those libraries; the profile baked from `packages/` | local runs and browser-driven checks |
 
-Build the dev image with `pnpm dev`: it compiles the packages, then builds `:base` and `:dev` in
-that order. The order is the point — `:base` carries `tools/` and `entrypoint.sh`, so a `:dev`
-built without rebuilding it keeps the old ones, which is a stale image that looks fresh.
+Build the dev image with `pnpm dev`, which builds `:base` and then `:dev` — in that order, and the
+order is the point: `:base` carries `tools/` and `entrypoint.sh`, so a `:dev` built without
+rebuilding it keeps the old ones, which is a stale image that looks fresh. Each image compiles the
+packages itself, and a local `lib/` is kept out of the context entirely: `pnpm build` is for a
+checkout's own `lib/` (`prepack` runs it on publish), never an input to an image.
 `docker compose build` is the published image on its own — the one build that needs the plugins
 published.
 
