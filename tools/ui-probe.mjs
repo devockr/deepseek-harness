@@ -47,9 +47,10 @@ const isLoopback = (host) =>
   host === 'localhost' || host === '::1' || host === '[::1]' || host.startsWith('127.')
 
 const HOME = process.env.PROBE_HOME ?? '/tmp/dsh-ui-probe'
-// Whether this run owns HOME: a directory that was already there can hold someone's profile, and
-// the cleanup below must never take it away.
-const HOME_EXISTED = existsSync(HOME)
+// Whether this run owns HOME. A caller-supplied PROBE_HOME can hold their own profile, so it is
+// never removed; the default directory is ours, and a run that was kept or killed must not turn
+// every later run into a reuse of its leftovers.
+const HOME_EXISTED = process.env.PROBE_HOME != null && existsSync(HOME)
 const SHOTS = process.env.PROBE_SHOTS ?? '/home/app/.dsh/cache/ui-probe'
 const PROFILE = process.env.PROBE_PROFILE ?? 'probe'
 const HOST = values('--host')[0] ?? '127.0.0.1'
@@ -256,6 +257,7 @@ const browser = await chromium.launch({
 const PHONE = { hasTouch: true, viewport: { width: 390, height: 844 } }
 const page = await browser.newPage(SCENARIO === 'mobile' ? PHONE : { viewport: { width: 1280, height: 900 } })
 const problems = []
+let completed = false
 // Everything, not just errors: cordis reports an unmet `inject` as a warning the
 // boot audit later summarizes as a bare "failed".
 const console_all = []
@@ -422,14 +424,19 @@ try {
       `console log : ${console_all.length ? '\n  ' + console_all.slice(-25).join('\n  ') : 'none'}`,
     ].join('\n') + '\n',
   )
+  completed = true
 } finally {
   await browser.close()
   if (KEEP) {
     // Printing and returning leaves the piped server attached to this process, so the probe would
     // never give the shell back: unref the child and end on purpose, leaving it running.
     process.stdout.write(`kept: ${HOME} (pid ${child.pid})\n${out.slice(-400)}\n`)
+    // Unref everything that would hold the loop open and let the process end on its own: a scenario
+    // that threw still surfaces its stack trace, and the exit code says the run failed.
+    child.stdout?.unref?.()
+    child.stderr?.unref?.()
     child.unref()
-    process.exit(0)
+    process.exitCode = completed ? 0 : 1
   }
   child.kill('SIGTERM')
   forget()
