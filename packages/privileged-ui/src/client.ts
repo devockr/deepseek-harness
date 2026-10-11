@@ -69,13 +69,16 @@ window.__ModuleLoader__.load({
         mark('SELF-CHECK-FAILED not writable: ' + (error as Error).message)
         return
       }
-      // Whether the consumers can see this depends on when they read it: the gateway
-      // copies the flag into its `$host` facts when it activates, and the settings
-      // pages read `$host.isLoopback`. Reporting both values is what tells us whether
-      // flipping here is enough or whether those rows have to be re-activated.
+      // Whether the consumers can see this depends on when they read it: the gateway copies the
+      // flag into its `$host` facts when it activates, and the settings pages read
+      // `$host.isLoopback`. So the flag alone is not the point — a live gateway that still says false
+      // is the activation-order regression this package exists to prevent, and it has to fail as
+      // loudly as a property that cannot be written. A profile with no gateway at all reports
+      // undefined, which is not judged.
       const host = ctx.remote?.$host?.isLoopback
       const state = 'connection:' + before + '->' + connection.isLoopback + ' host:' + host
-      mark(connection.isLoopback === true ? state : 'SELF-CHECK-FAILED ' + state)
+      const visible = connection.isLoopback === true && host !== false
+      mark(visible ? state : 'SELF-CHECK-FAILED ' + state)
       ctx.on('dispose', () => {
         try {
           connection.isLoopback = before
