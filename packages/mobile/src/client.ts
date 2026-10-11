@@ -4,30 +4,10 @@
 // files at build time: two CSS rules injected into dist/index.html, a rewritten
 // dist/favicon.svg, and a sed-injected branch inside the composer's keydown handler.
 // Doing them here means the image can ship an untouched dsh and install a package.
-interface Window {
-  __ModuleLoader__: {
-    load(module: { id: string; factory: () => unknown }): void
-  }
-}
-
-interface Disposable {
-  (): void
-}
-
-interface PluginExports {
-  name?: string
-  inject?: string[]
-  apply?: (ctx: PluginContext) => void
-}
-
-interface PluginContext {
-  on(event: 'dispose', handler: () => void): void
-}
-
 window.__ModuleLoader__.load({
   id: '@idsh/mobile',
   factory: () => {
-    const module: { exports: PluginExports } = { exports: {} }
+    const module: { exports: Record<string, unknown> } = { exports: {} }
     const exports = module.exports
     Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' })
 
@@ -144,7 +124,8 @@ window.__ModuleLoader__.load({
           mark(state + ' icon:ok')
         })
         .catch((error: unknown) => mark(state + ' icon:' + (error as Error).message))
-      ctx.on('dispose', () => {
+      // cordis's own teardown: the effect body returns what undoes it.
+      ctx.effect(() => () => {
         disposed = true
         for (const off of teardown) {
           try {

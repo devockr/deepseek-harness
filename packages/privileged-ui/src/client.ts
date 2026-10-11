@@ -14,28 +14,10 @@
 //
 // This is deliberately an exception to a designed boundary. Read the package README
 // before installing it.
-interface Window {
-  __ModuleLoader__: {
-    load(module: { id: string; factory: () => unknown }): void
-  }
-}
-
-interface PluginExports {
-  name?: string
-  inject?: string[]
-  apply?: (ctx: PluginContext) => void
-}
-
-interface PluginContext {
-  connection?: { isLoopback?: boolean }
-  remote?: { $host?: { isLoopback?: boolean } }
-  on(event: 'dispose', handler: () => void): void
-}
-
 window.__ModuleLoader__.load({
   id: '@idsh/privileged-ui',
   factory: () => {
-    const module: { exports: PluginExports } = { exports: {} }
+    const module: { exports: Record<string, unknown> } = { exports: {} }
     const exports = module.exports
     Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' })
 
@@ -57,7 +39,16 @@ window.__ModuleLoader__.load({
     exports.inject = ['connection', 'remote']
 
     function apply(ctx: PluginContext): void {
-      const connection = ctx.connection
+      // The one place this package reaches past the published client types, and it is the point of
+      // the package: dsh's `Context` does not declare `connection` or `remote` for client plugins,
+      // and it declares the flag `readonly` on the host side, because a served page is not supposed
+      // to write it at all. Stating the shape here is smaller than a hand-written context interface
+      // and keeps everything else — `ctx.effect` included — checked against dsh's own types.
+      const services = ctx as unknown as {
+        connection?: { isLoopback: boolean }
+        remote?: { $host?: { isLoopback?: boolean } }
+      }
+      const connection = services.connection
       const before = connection?.isLoopback
       if (connection === undefined || typeof before !== 'boolean') {
         mark('SELF-CHECK-FAILED connection.isLoopback is ' + typeof before)
@@ -75,11 +66,12 @@ window.__ModuleLoader__.load({
       // is the activation-order regression this package exists to prevent, and it has to fail as
       // loudly as a property that cannot be written. A profile with no gateway at all reports
       // undefined, which is not judged.
-      const host = ctx.remote?.$host?.isLoopback
+      const host = services.remote?.$host?.isLoopback
       const state = 'connection:' + before + '->' + connection.isLoopback + ' host:' + host
       const visible = connection.isLoopback === true && host !== false
       mark(visible ? state : 'SELF-CHECK-FAILED ' + state)
-      ctx.on('dispose', () => {
+      // cordis's own teardown: the effect body returns what undoes it.
+      ctx.effect(() => () => {
         try {
           connection.isLoopback = before
         } catch {}
