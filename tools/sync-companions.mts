@@ -36,7 +36,9 @@ const packageOf = async (dir: string) =>
  * the package never shipped would otherwise look like a broken package — and the repair for that
  * replaces an operator's customized copy with the image's, which is a fine thing to do for a package
  * that cannot load and a bad thing to do for one that can. A wildcard target is a pattern rather
- * than a file, so it is skipped as well.
+ * than a file, so it is skipped as well — and so is a condition object this cannot read (an
+ * `import`/`require` pair with no `default`, say): leaving a package alone is always safer than
+ * replacing it on a guess about which target the loader would have picked.
  */
 const entriesOf = (manifest: Package | undefined): string[] => {
   const pick = (value: unknown): string | undefined => {

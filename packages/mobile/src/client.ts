@@ -116,7 +116,10 @@ window.__ModuleLoader__.load({
         .replace(/(<path[^>]*)fill="#[0-9A-Fa-f]{3,6}"/g, '$1fill="#FFFFFF"')
         .replace(/(<svg[^>]*)viewBox="[^"]*"/, '$1viewBox="-7.83 -7.83 66 66"')
         .replace(/(<svg[^>]*)width="[0-9.]+" height="[0-9.]+"/, '$1width="1024" height="1024"')
-        .replace(/<path/, '<rect x="-7.83" y="-7.83" width="66" height="66" fill="#4D6BFE"/><path')
+        .replace(
+          /<path/,
+          '<rect x="-7.83" y="-7.83" width="66" height="66" rx="12" ry="12" fill="#4D6BFE"/><path',
+        )
       const icon = document.createElement('link')
       icon.rel = 'apple-touch-icon'
       icon.dataset.idshMobile = 'icon'
