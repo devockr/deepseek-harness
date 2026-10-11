@@ -429,15 +429,15 @@ try {
   await browser.close()
   if (KEEP) {
     // Printing and returning leaves the piped server attached to this process, so the probe would
-    // never give the shell back: unref the child and end on purpose, leaving it running.
+    // never give the shell back: unref the child and end on purpose, leaving it running. `else`, not
+    // an early return — a return in a finally would discard a thrown scenario's stack trace.
     process.stdout.write(`kept: ${HOME} (pid ${child.pid})\n${out.slice(-400)}\n`)
-    // Unref everything that would hold the loop open and let the process end on its own: a scenario
-    // that threw still surfaces its stack trace, and the exit code says the run failed.
     child.stdout?.unref?.()
     child.stderr?.unref?.()
     child.unref()
     process.exitCode = completed ? 0 : 1
+  } else {
+    child.kill('SIGTERM')
   }
-  child.kill('SIGTERM')
   forget()
 }
