@@ -66,9 +66,10 @@ tracked `.gitignore` already ignores `.tasks/`.
 Build the dev image with `pnpm dev`: it compiles the packages (`pnpm build`), then builds `:base`
 and then `:dev` — in that order, and both orders are the point. `:base` carries `tools/` and
 `entrypoint.sh`, so a `:dev` built without rebuilding it keeps the old ones, which is a stale image
-that looks fresh; and the compiled `lib/` is what dsh loads, so `Dockerfile.dev` refuses to build a
-package that has none rather than shipping one that cannot load. `prepack` runs the same build on
-publish.
+that looks fresh; and the compiled `lib/` is what dsh loads, so `Dockerfile.dev` refuses to build a package
+that has none — or whose `src/` is newer than its `lib/`, which is what a forgotten rebuild
+looks like — rather than shipping one that cannot load, or is stale. `prepack` runs the same
+build on publish.
 `docker compose build` is the published image on its own — the one build that needs the plugins
 published.
 

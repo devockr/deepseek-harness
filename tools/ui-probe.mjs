@@ -47,6 +47,9 @@ const isLoopback = (host) =>
   host === 'localhost' || host === '::1' || host === '[::1]' || host.startsWith('127.')
 
 const HOME = process.env.PROBE_HOME ?? '/tmp/dsh-ui-probe'
+// Whether this run owns HOME: a directory that was already there can hold someone's profile, and
+// the cleanup below must never take it away.
+const HOME_EXISTED = existsSync(HOME)
 const SHOTS = process.env.PROBE_SHOTS ?? '/home/app/.dsh/cache/ui-probe'
 const PROFILE = process.env.PROBE_PROFILE ?? 'probe'
 const HOST = values('--host')[0] ?? '127.0.0.1'
@@ -61,12 +64,16 @@ const DSH = process.env.PROBE_DSH ?? 'dsh'
 const dshArgv = (args) => (DSH.endsWith('.js') ? [process.execPath, ['--expose-internals', DSH, ...args]] : [DSH, args])
 
 // The instance is ours to clean up whatever happens: a rejected boot, a thrown scenario or an
-// early exit all land here, so nothing outlives the probe unless --keep asked for it.
+// early exit all land here, so nothing outlives the probe unless --keep asked for it — and a HOME
+// that was already there is not ours to delete.
 let child
+const forget = () => {
+  if (!KEEP && !HOME_EXISTED) rmSync(HOME, { recursive: true, force: true })
+}
 process.on('exit', () => {
   if (KEEP) return
   child?.kill('SIGTERM')
-  rmSync(HOME, { recursive: true, force: true })
+  forget()
 })
 
 mkdirSync(SHOTS, { recursive: true })
@@ -212,18 +219,25 @@ if (flag('--no-browser')) {
     ),
   ]
   process.stdout.write(`bundle urls : ${urls.length}\n`)
+  // The boot graph naming a plugin is not the same as the shell serving its bundle: a client half
+  // that never made it into the composition would otherwise pass this mode silently.
+  for (const wanted of ['privileged-ui', 'mobile']) {
+    const served = urls.some((u) => u.includes(`@idsh/${wanted}/client.js`))
+    if (!served) failed = true
+    process.stdout.write(`bundle for ${wanted}: ${served ? 'yes' : 'NO'}\n`)
+  }
   for (const u of urls) {
     const target = u.startsWith('http') ? u : origin + (u.startsWith('/') ? '' : '/') + u
     const res = await fetch(target)
     if (res.status >= 400) failed = true
     process.stdout.write(`  ${res.status} ${res.headers.get('content-type') ?? ''} ${u}\n`)
   }
-  if (!KEEP) {
-    child.kill('SIGTERM')
-    rmSync(HOME, { recursive: true, force: true })
-  } else {
+  if (KEEP) {
     process.stdout.write(`kept: ${HOME} (pid ${child.pid})\n`)
+  } else {
+    child.kill('SIGTERM')
   }
+  forget()
   process.exit(failed ? 1 : 0)
 }
 
@@ -410,10 +424,13 @@ try {
   )
 } finally {
   await browser.close()
-  if (!KEEP) {
-    child.kill('SIGTERM')
-    rmSync(HOME, { recursive: true, force: true })
-  } else {
+  if (KEEP) {
+    // Printing and returning leaves the piped server attached to this process, so the probe would
+    // never give the shell back: unref the child and end on purpose, leaving it running.
     process.stdout.write(`kept: ${HOME} (pid ${child.pid})\n${out.slice(-400)}\n`)
+    child.unref()
+    process.exit(0)
   }
+  child.kill('SIGTERM')
+  forget()
 }
