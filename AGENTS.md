@@ -20,17 +20,18 @@ tracked `.gitignore` already ignores `.tasks/`.
   and *strictly* — a release that cannot ship its own plugins is not a release, so the build fails
   while one is unpublished. `Dockerfile.dev` is built from the same `base` target, never from the
   published image, so it does not depend on anything being published; it adds the headless shell's
-  libraries, and bakes the same profile from this checkout's `packages/` as a `link:` — that is how a
-  deployment that mounts a checkout over `/opt/dsh/packages` runs that source and sees edits
-  immediately. A test or development convenience never goes into `Dockerfile`; the published image
+  libraries, and bakes the same profile from this checkout's `packages/` as a `link:`. A
+  deployment may mount a checkout over `/opt/dsh/packages`, but that checkout has to be **built**
+  first (`pnpm --recursive build` turns `src/` into the `lib/` the manifests name): a linked
+  package whose entry files are missing is put back to the image's copy, exactly like a broken one. A test or development convenience never goes into `Dockerfile`; the published image
   *should* fail to launch a browser.
 - **The image bakes the profile; the entrypoint keeps it to that.** A deployment with no profile gets
   the baked one, exactly as built — that is what keeps a restart free of downloads. An existing
   profile keeps the packages the image declares in the state it declares, compared by the version in
   each package's *own* `package.json`: one that is missing, declares without files, or sits below the
   image's version is put in place the way the image installed it — a `link:` when the image linked
-  (how `Dockerfile.dev` gives a deployment that mounts a checkout over `/opt/dsh/packages` source
-  whose edits show up immediately), files otherwise, and `file:` specs refreshed on every boot
+  (how `Dockerfile.dev` gives a deployment that mounts a **built** checkout over
+  `/opt/dsh/packages` source to run), files otherwise, and `file:` specs refreshed on every boot
   because their string cannot show that their files changed. One at that version or above is left
   alone, which is where a pin or a fork lives. Nothing is ever removed, and turning a package off
   means dropping it from `dsh.profile.bundles`, never uninstalling it. Nothing names a package in the

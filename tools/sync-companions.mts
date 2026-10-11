@@ -20,6 +20,8 @@ interface Manifest {
 
 interface Package {
   version?: string
+  main?: string
+  exports?: Record<string, unknown>
 }
 
 const exists = async (path: string) => (await stat(path).catch(() => undefined)) !== undefined
@@ -27,6 +29,29 @@ const exists = async (path: string) => (await stat(path).catch(() => undefined))
 const packageOf = async (dir: string) =>
   (await import(join(dir, 'package.json'), { with: { type: 'json' } }).catch(() => undefined))
     ?.default as Package | undefined
+
+/**
+ * Every file the manifest points at — `main`, and every `exports` target — since one of them
+ * being absent means dsh has nothing to load. A manifest with none of them is a patch-only
+ * package, which is fine.
+ */
+const entriesOf = (manifest: Package | undefined): string[] => {
+  const found: string[] = []
+  const walk = (value: unknown): void => {
+    if (typeof value === 'string') {
+      found.push(value)
+    } else if (value && typeof value === 'object') {
+      for (const nested of Object.values(value)) {
+        walk(nested)
+      }
+    }
+  }
+  if (typeof manifest?.main === 'string') {
+    found.push(manifest.main)
+  }
+  walk(manifest?.exports)
+  return found
+}
 
 /** The numeric parts only, which is what these packages use; an unreadable one compares equal. */
 const compare = (a: string | undefined, b: string | undefined) => {
@@ -105,15 +130,31 @@ if (liveModule) {
   for (const [name, spec] of Object.entries(bakedManifest.dependencies)) {
     const target = join(live, 'node_modules', name)
     const present = await exists(target)
-    const installed = present ? (await packageOf(target))?.version : undefined
+    const installedManifest = present ? await packageOf(target) : undefined
+    const installed = installedManifest?.version
     const wanted = (await packageOf(join(baked, 'node_modules', name)))?.version
     // A directory dsh cannot read a manifest from is no more usable than a missing one — and the
     // version comparison alone would call it equal and leave it there.
-    const unusable = !present || (installed === undefined && wanted !== undefined)
+    const absent = (
+      await Promise.all(
+        entriesOf(installedManifest).map(async (entry) =>
+          (await exists(resolve(target, entry))) ? undefined : entry,
+        ),
+      )
+    ).filter((entry) => entry !== undefined)
+    // A manifest whose own entry files are absent compiles to nothing dsh can load — which is what
+    // a checkout mounted over the packages directory looks like before its build has run.
+    const unusable =
+      !present || (installed === undefined && wanted !== undefined) || absent.length > 0
 
     // `file:` is the one spec whose string cannot show that its files changed, so it is refreshed
     // whenever it is seen; everything else is only replaced when it is unusable or behind.
     if (!wasInstalled.has(name) || unusable || compare(installed, wanted) < 0 || spec.startsWith('file:')) {
+      if (absent.length > 0) {
+        console.error(
+          `sync-companions: ${name} has no ${absent.join(', ')} — installing the image's copy`,
+        )
+      }
       // Both sides can be pnpm links — the destination into the live profile's store, the source
       // into the image's — so a link is recreated and files are dereferenced. The scope directory
       // may not exist yet on either path.
