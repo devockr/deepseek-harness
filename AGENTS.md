@@ -63,9 +63,11 @@ tracked `.gitignore` already ignores `.tasks/`.
 | `deepseek-harness-dsh:latest` | `:base` + a profile baked from the registry (strict) | the deployment |
 | `deepseek-harness-dsh:dev` | `:base` + those libraries; the profile baked from `packages/` | local runs and browser-driven checks |
 
-Build the base first, then the dev image: `docker build --target base -t deepseek-harness-dsh:base .`
-and `docker build -f Dockerfile.dev -t deepseek-harness-dsh:dev .`. `docker compose build` is the
-published image on its own — the one build that needs the plugins published.
+Build the dev image with `pnpm dev`: it compiles the packages, then builds `:base` and `:dev` in
+that order. The order is the point — `:base` carries `tools/` and `entrypoint.sh`, so a `:dev`
+built without rebuilding it keeps the old ones, which is a stale image that looks fresh.
+`docker compose build` is the published image on its own — the one build that needs the plugins
+published.
 
 A cached layer once left a browser-dependency set inside `:latest` that the Dockerfile no longer
 declared. After an apt change, check the image instead of trusting the build; `--no-cache` when in
