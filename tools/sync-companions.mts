@@ -31,26 +31,26 @@ const packageOf = async (dir: string) =>
     ?.default as Package | undefined
 
 /**
- * Every file the manifest points at — `main`, and every `exports` target — since one of them
- * being absent means dsh has nothing to load. A manifest with none of them is a patch-only
- * package, which is fine.
+ * The files dsh itself loads: the host half (`main`, or the `.` export standing in for it) and the
+ * browser half (`./client`). Nothing else is checked. An unused export subpath pointing at a file
+ * the package never shipped would otherwise look like a broken package — and the repair for that
+ * replaces an operator's customized copy with the image's, which is a fine thing to do for a package
+ * that cannot load and a bad thing to do for one that can. A wildcard target is a pattern rather
+ * than a file, so it is skipped as well.
  */
 const entriesOf = (manifest: Package | undefined): string[] => {
-  const found: string[] = []
-  const walk = (value: unknown): void => {
+  const pick = (value: unknown): string | undefined => {
     if (typeof value === 'string') {
-      found.push(value)
-    } else if (value && typeof value === 'object') {
-      for (const nested of Object.values(value)) {
-        walk(nested)
-      }
+      return value
     }
+    return value && typeof value === 'object'
+      ? pick((value as Record<string, unknown>).default)
+      : undefined
   }
-  if (typeof manifest?.main === 'string') {
-    found.push(manifest.main)
-  }
-  walk(manifest?.exports)
-  return found
+  const exports = (manifest?.exports ?? {}) as Record<string, unknown>
+  return [manifest?.main, pick(exports['.']), pick(exports['./client'])].filter(
+    (entry): entry is string => typeof entry === 'string' && !entry.includes('*'),
+  )
 }
 
 /** The numeric parts only, which is what these packages use; an unreadable one compares equal. */

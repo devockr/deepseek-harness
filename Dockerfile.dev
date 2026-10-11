@@ -3,8 +3,11 @@
 # pick these up by accident — and it is built from Dockerfile's `base` target instead of the
 # published image, so it does not depend on the plugins being published.
 #
-#   docker build --target base -t deepseek-harness-dsh:base .
-#   docker build -f Dockerfile.dev -t deepseek-harness-dsh:dev .
+#   pnpm dev
+#
+# which compiles the packages and then builds `:base` and `:dev` in that order — `:base` carries
+# `tools/` and `entrypoint.sh`, and the compiled `lib/` is what the profile links to, so neither
+# step can be skipped or swapped.
 #
 # Then run a browser-driven check in it, sharing the deployment's state and network namespace
 # so it can reach the running GUI on 127.0.0.1. `--entrypoint` is required: without it the
@@ -32,9 +35,9 @@
 # nine covers all of them). libxfixes3 is explicit because nothing in bookworm depends on
 # it. There is no Debian meta-package for this set: the one-name shortcuts are both heavier
 # and incomplete (`chromium` drags a whole browser, `libgtk-3-0` drags GTK + pango + cairo
-# and still misses nss/nspr/asound/gbm). The checks that drive this browser assert DOM and
-# computed CSS, never pixels, so fonts are not needed — add fonts-liberation + libfontconfig1
-# + libfreetype6 if readable screenshots ever matter.
+# and still misses nss/nspr/asound/gbm). A font is not in that set for its own sake: without one,
+# Skia aborts the renderer the first time a page shapes text, which is every page, so
+# fonts-liberation and fontconfig's own configuration are installed below.
 ARG BASE=deepseek-harness-dsh:base
 FROM ${BASE}
 
