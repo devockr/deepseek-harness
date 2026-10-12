@@ -59,7 +59,7 @@ const docker = async (
       '/usr/local/bin/docker',
       '/usr/bin/docker',
       '/opt/bin/docker',
-    ].filter(Boolean)
+    ].filter((candidate): candidate is string => typeof candidate === 'string')
     for (const candidate of candidates) {
       try {
         await run(candidate, ['version'])
@@ -86,7 +86,7 @@ const docker = async (
       )
     }
   }
-  return run(dockerBin, args, extraEnv)
+  return run(dockerBin ?? die('docker not found'), args, extraEnv)
 }
 
 // compose interpolates this with `:?`; an empty one produces a container that starts but cannot
@@ -219,14 +219,14 @@ if (dry) {
 //    image is the predictable failure, and it used to fail before anything was touched. The
 //    pre-flight run above happens to prove the image exists too, but only when the deployment
 //    mounts something — a config with no mounts never reaches docker before the removal.
-if (service.image === undefined) {
+const devImage =
+  service.image ??
   die('the overlay names no image, so there is nothing to recreate from')
-}
 try {
-  await docker(['image', 'inspect', service.image])
+  await docker(['image', 'inspect', devImage])
 } catch {
   die(
-    `image ${service.image} is not in this daemon — run \`pnpm dev\` first; nothing was touched`,
+    `image ${devImage} is not in this daemon — run \`pnpm dev\` first; nothing was touched`,
   )
 }
 console.log('deploy:dev: recreating (remove the container, then up --no-build)')
