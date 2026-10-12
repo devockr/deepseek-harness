@@ -239,7 +239,10 @@ try {
   )
 }
 
-const READINESS_ATTEMPTS = 30
+// A container is not instant on a small NAS: every boot re-resolves the profile and its plugins,
+// which has taken over two minutes here. The wait is therefore generous by default and overridable
+// for a host that needs longer.
+const READINESS_WAIT_MS = Number(process.env.DEPLOY_WAIT_MS ?? 5 * 60 * 1000)
 const READINESS_POLL_MS = 4000
 
 const isReady = async (): Promise<boolean> => {
@@ -260,7 +263,8 @@ const isReady = async (): Promise<boolean> => {
   }
 }
 
-for (let attempt = 1; attempt <= READINESS_ATTEMPTS; attempt++) {
+const attempts = Math.ceil(READINESS_WAIT_MS / READINESS_POLL_MS)
+for (let attempt = 1; attempt <= attempts; attempt++) {
   if (await isReady()) {
     const runningImage = await docker([
       'inspect',
@@ -274,6 +278,12 @@ for (let attempt = 1; attempt <= READINESS_ATTEMPTS; attempt++) {
   await sleep(READINESS_POLL_MS)
 }
 
+// A false failure is worse than a slow one: when the wait runs out, show what the container
+// actually said, so "not up yet" and "up but silent" can be told apart at a glance.
+const lastLines = await docker(['logs', '--tail', '20', 'dsh']).catch(
+  () => '(could not read the logs)',
+)
 die(
-  'the new container did not report "dsh web:" within two minutes — check `docker logs dsh`',
+  `the new container did not report "dsh web:" within ${Math.round(READINESS_WAIT_MS / 1000)}s ` +
+    `(DEPLOY_WAIT_MS overrides it). Its last lines:\n${lastLines.trim()}`,
 )
