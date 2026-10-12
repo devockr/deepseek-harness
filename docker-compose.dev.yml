@@ -2,9 +2,7 @@
 #
 #   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --no-build
 #
-# It is safe to commit: a path inside the bind-mounted state directory and a public mirror. The
-# published image has no browser libraries on purpose — a release should fail to launch a browser
-# rather than carry one — so neither variable does anything there.
+# Neither variable does anything in the published image, which has no browser libraries on purpose.
 services:
   dsh:
     environment:

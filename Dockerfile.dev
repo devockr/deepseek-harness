@@ -1,6 +1,5 @@
-# The dev image: everything the published image is built from, plus the shared libraries the
-# browsers link — the headless shell's set, and the three the full Chromium adds on top of it.
-# It is a separate file on purpose — the deployment build must never
+# The dev image: everything the published image is built from, plus the browsers' shared
+# libraries. It is a separate file on purpose — the deployment build must never
 # pick these up by accident — and it is built from Dockerfile's `base` target instead of the
 # published image, so it does not depend on the plugins being published.
 #
@@ -21,39 +20,31 @@
 #     --entrypoint node -v "$PWD:/checkout" -w /checkout \
 #     deepseek-harness-dsh:dev <check>.mjs
 #
-# The browser binary itself is not in either image: it lives in the mounted cache
-# (~/.dsh/cache/ms-playwright, populated once with `pnpm exec playwright install`), which is
-# why the checks that drive it set PLAYWRIGHT_BROWSERS_PATH.
+# The browser itself is in neither image: it lives in the mounted cache
+# (~/.dsh/cache/ms-playwright), populated once with `pnpm exec playwright install`.
 #
-# The library list is measured, not `playwright install-deps chromium`'s. That one also
-# serves *headed* Chromium, so it carries xvfb, five font packages and xfonts-scalable on top
-# of most of this. The check here is `ldd` against the binaries themselves: the headless shell
-# asks for 21 sonames on a clean bookworm, and the full Chromium in `chromium-*/chrome-linux64`
-# asks for three the shell does not — libcups2, libcairo2, libpango-1.0-0.
+# The list below is measured with `ldd` against both binaries, not copied from
+# `playwright install-deps chromium` — that one also serves headed Chromium, so it adds xvfb,
+# five font packages and xfonts-scalable. The headless shell asks for 21 sonames; the full
+# Chromium in `chromium-*/chrome-linux64` asks for three more (libcups2, libcairo2,
+# libpango-1.0-0).
 #
-# Nine names, not twenty-one: the other libs the browser links are hard dependencies of
-# these, so apt brings them along (libx11-6, libxext6, libxcb1, libglib2.0-0, libexpat1,
-# libdbus-1-3, libnspr4, libatk1.0-0, libatspi2.0-0 — `apt-cache depends --recurse` on the
-# nine covers all of them). libxfixes3 is explicit because nothing in bookworm depends on
-# it, and the full Chromium's three are named for the same reason: their own chain
-# (harfbuzz, fribidi, thai, pixman, xcb-render/shm, avahi) follows from them. There is no
-# Debian meta-package for this set: the one-name shortcuts are both heavier and incomplete
-# (`chromium` drags a whole browser, `libgtk-3-0` drags GTK + pango + cairo and still misses
-# nss/nspr/asound/gbm). A font is not in that set for its own sake: without one, Skia aborts
-# the renderer the first time a page shapes text, which is every page, so fonts-liberation and
-# fontconfig's own configuration are installed below.
+# The nine shell names cover those 21: the rest are hard dependencies of them (libx11-6,
+# libxext6, libxcb1, libglib2.0-0, libexpat1, libdbus-1-3, libnspr4, libatk1.0-0,
+# libatspi2.0-0). libxfixes3 is explicit because nothing in bookworm depends on it; the
+# Chromium three bring their own chain (harfbuzz, fribidi, thai, pixman, xcb-render/shm,
+# avahi). There is no Debian meta-package for this set: the one-name shortcuts are both
+# heavier and incomplete (`chromium` drags a whole browser, `libgtk-3-0` drags GTK + pango +
+# cairo and still misses nss/nspr/asound/gbm). fonts-liberation and fontconfig's
+# configuration are here because Skia aborts the renderer the first time a page shapes text,
+# which is every page. Headed runs would need the X/GTK set and an X server as well; nothing
+# here installs one.
 ARG BASE=deepseek-harness-dsh:base
 FROM ${BASE}
 
 # An ARG before FROM is only usable in the FROM line, so the registry has to be declared again.
 ARG NPM_REGISTRY=https://registry.npmmirror.com/
 
-# What the browsers need: the headless shell's own set — a font is not there for its own sake,
-# since without one Skia aborts the renderer the first time a page shapes text, which is every page,
-# so fonts-liberation and fontconfig's configuration come along — plus the three libraries that the
-# full Chromium adds on top of it. `ldd <cache>/chromium-*/chrome-linux64/chrome` is the check; the
-# three pull in their own dependencies (harfbuzz, fribidi, thai, pixman, xcb-render/shm, avahi).
-# Headed runs would need the X/GTK set and an X server as well; nothing here installs one.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       libatk-bridge2.0-0 libgbm1 libxrandr2 libxcomposite1 libxdamage1 libxfixes3 \
       libxkbcommon0 libnss3 libasound2 fonts-liberation fontconfig \
