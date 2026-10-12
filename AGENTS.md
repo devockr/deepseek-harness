@@ -146,6 +146,16 @@ Observe the running thing; do not reason from source.
   `lib/index.js` — or `lib/client.js`, when the package also has a browser half — is missing, or
   older than its `src/`, so a forgotten rebuild fails the build instead of shipping a `link:`
   target with nothing to load.
+- **A package has no URL.** Its browser half arrives through the bundle endpoint
+  (`plugins/??<pkg>/client.js,…&rev=…`), and nothing else under the package is reachable — on a
+  deployment the app's own `/favicon.svg` answers 200 while every `/plugins/…` path answers 404.
+  What dsh does expose is the manifest `icon` field: a path relative to the package, SVG/PNG/JPEG/
+  WebP up to 256KiB, read by the host without activating the plugin and handed to the web UI as a
+  `data:` URI. A file the page itself needs therefore has to travel inside the browser half.
+- **Synthetic keyboard events have no default behaviour.** A plugin that wants an editor command
+  has to drive it: the composer is Lexical, and its `insertLineBreak` runs from `beforeinput` — a
+  dispatched `Shift+Enter` inserts nothing, however it is routed.
+
 - A patch **replaces the row's whole `config`** — restate every key that should survive.
 - Patch YAML takes `#` comments only; `//` fails validation and the install rolls back.
 - `link:` dogfoods from source; `file:` copies.
