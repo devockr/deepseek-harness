@@ -26,8 +26,9 @@ naming a public mirror here leaks nothing.
   profile from this checkout's `packages/` as a `link:`. A deployment may mount a checkout over
   `/opt/dsh/packages`, but that checkout has to be **built**
   first (`pnpm --recursive build` turns `src/` into the `lib/` the manifests name): a linked
-  package whose entry files are missing is put back to the image's copy, exactly like a broken one. A test or development convenience never goes into `Dockerfile`; the published image
-  *should* fail to launch a browser.
+  package whose entry files are missing is put back to the image's copy, exactly like a broken one.
+  A test or development convenience never goes into `Dockerfile`; the published image *should* fail to
+  launch a browser.
 - **The image bakes the profile; the entrypoint keeps it to that.** A deployment with no profile gets
   the baked one, exactly as built — that is what keeps a restart free of downloads. An existing
   profile keeps the packages the image declares in the state it declares, compared by the version in
