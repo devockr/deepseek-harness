@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // Recreate the deployment from the `:dev` image, the way this repo intends: the dev overlay is
 // always merged in, compose never builds (`pnpm dev` does that, in that order), and the binds are
 // pre-flighted so a mistake cannot take the deployment down. `--dry` stops after the pre-flight.
@@ -9,8 +8,8 @@
 // This one runs from a checkout on the host, where the root package.json makes `.ts` ESM. Tools
 // the image ships and runs itself keep the `.mts` extension: /opt/dsh/tools has no package.json,
 // so a `.ts` there would be CommonJS.
-import fs from 'node:fs/promises'
 import { execFile } from 'node:child_process'
+import fs from 'node:fs/promises'
 import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
@@ -59,7 +58,7 @@ const docker = async (
       '/usr/local/bin/docker',
       '/usr/bin/docker',
       '/opt/bin/docker',
-    ].filter((candidate): candidate is string => Boolean(candidate))
+    ].filter(Boolean)
     for (const candidate of candidates) {
       try {
         await run(candidate, ['version'])
@@ -115,14 +114,14 @@ const compose = (args: string[]): Promise<string> =>
 
 // 1) What will be deployed, and to which image — read from the resolved config, so this is the
 //    deployment about to be created rather than the one that is running now.
-type Mount = {
+interface Mount {
   type?: string
   source?: string
   target?: string
   read_only?: boolean
   bind?: { create_host_path?: boolean }
 }
-type Resolved = {
+interface Resolved {
   services?: Record<string, { image?: string; volumes?: Mount[] }>
 }
 const resolved = JSON.parse(

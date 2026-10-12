@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * The companion half of entrypoint.sh, for a profile that already exists: it keeps the packages the
  * image baked in the state that image declares. A package the profile does not have, declares
@@ -25,13 +24,13 @@ interface Package {
 }
 
 const exists = async (path: string) =>
-  (await fs.stat(path).catch(() => undefined)) !== undefined
+  (await fs.stat(path).catch(() => {})) !== undefined
 
 const packageOf = async (dir: string) =>
   (
     await import(path.join(dir, 'package.json'), {
       with: { type: 'json' },
-    }).catch(() => undefined)
+    }).catch(() => {})
   )?.default as Package | undefined
 
 /**
@@ -53,7 +52,7 @@ const entriesOf = (manifest: Package | undefined): string[] => {
       ? pick((value as Record<string, unknown>).default)
       : undefined
   }
-  const exports = (manifest?.exports ?? {}) as Record<string, unknown>
+  const exports = manifest?.exports ?? {}
   return [manifest?.main, pick(exports['.']), pick(exports['./client'])].filter(
     (entry): entry is string =>
       typeof entry === 'string' && !entry.includes('*'),
@@ -99,7 +98,7 @@ const atomicReplace = async (
   // dropped once the swap succeeded — and put back if it did not, so the installed thing is never
   // left absent for the next boot to trip over. `lstat`, because a dangling link is an entry that
   // has to be moved out of the way: renaming a directory onto it fails instead.
-  const had = (await fs.lstat(target).catch(() => undefined)) !== undefined
+  const had = (await fs.lstat(target).catch(() => {})) !== undefined
   await fs.rm(parked, { recursive: true, force: true })
   if (had) {
     await fs.rename(target, parked)
@@ -108,7 +107,7 @@ const atomicReplace = async (
     await fs.rename(staging, target)
   } catch (error) {
     if (had) {
-      await fs.rename(parked, target).catch(() => undefined)
+      await fs.rename(parked, target).catch(() => {})
     }
     await fs.rm(staging, { recursive: true, force: true })
     throw error
@@ -127,7 +126,7 @@ if (!home) {
 const live = path.join(home, '.dsh/profiles/web')
 const liveManifest = path.join(live, 'package.json')
 const liveModule = await import(liveManifest, { with: { type: 'json' } }).catch(
-  () => undefined,
+  () => {},
 )
 
 if (liveModule) {

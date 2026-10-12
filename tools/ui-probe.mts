@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Boot a throwaway `dsh web` instance and drive it with a real browser.
  *
@@ -19,20 +18,20 @@
 
 // Must be set before playwright resolves its browser path. The default is a bind
 // mount, so the download survives `docker compose up -d --force-recreate`.
-process.env.PLAYWRIGHT_BROWSERS_PATH ??= '/home/app/.dsh/cache/ms-playwright'
-
-import { spawn } from 'node:child_process'
+import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
+process.env.PLAYWRIGHT_BROWSERS_PATH ??= '/home/app/.dsh/cache/ms-playwright'
+
 const argv = process.argv.slice(2)
-const flag = name => argv.includes(name)
+const flag = (name: string): boolean => argv.includes(name)
 /**
  * Every operand of a repeatable `name`, rejecting an absent one or a following flag: a silently
  * defaulted `--host` would probe the wrong origin, and an operand that looks like a flag is a typo.
  */
-const values = name => {
-  const found = []
+const values = (name: string): string[] => {
+  const found: string[] = []
   for (let index = 0; index < argv.length; index += 1) {
     if (argv[index] !== name) {
       continue
@@ -47,7 +46,7 @@ const values = name => {
   return found
 }
 /** The loopback authority, however it is spelled — `localhost` is not a remote origin. */
-const isLoopback = host =>
+const isLoopback = (host: string): boolean =>
   host === 'localhost' ||
   host === '::1' ||
   host === '[::1]' ||
@@ -74,7 +73,7 @@ const SCENARIO = values('--scenario')[0]
 // looks like; without it the probe drives the installed dsh.
 const DSH = process.env.PROBE_DSH ?? 'dsh'
 // The launcher wants --expose-internals, exactly as entrypoint.sh invokes it.
-const dshArgv = args =>
+const dshArgv = (args: string[]): [string, string[]] =>
   DSH.endsWith('.js')
     ? [process.execPath, ['--expose-internals', DSH, ...args]]
     : [DSH, args]
@@ -82,7 +81,7 @@ const dshArgv = args =>
 // The instance is ours to clean up whatever happens: a rejected boot, a thrown scenario or an
 // early exit all land here, so nothing outlives the probe unless --keep asked for it — and a HOME
 // that was already there is not ours to delete.
-let child
+let child: ChildProcess | undefined
 const forget = async () => {
   if (!KEEP && !HOME_EXISTED) {
     await fs.rm(HOME, { recursive: true, force: true })
@@ -130,7 +129,10 @@ process.on('unhandledRejection', error => void stop(error))
 await fs.mkdir(SHOTS, { recursive: true })
 
 /** Run dsh to completion, collecting both streams — the callers report status and output. */
-const run = (args, opts = {}) =>
+const run = (
+  args: string[],
+  opts: SpawnOptions = {},
+): Promise<{ status: number; stdout: string; stderr: string }> =>
   new Promise(resolve => {
     const proc = spawn(...dshArgv(args), {
       env: { ...process.env, DSH_HOME: HOME },
@@ -139,12 +141,14 @@ const run = (args, opts = {}) =>
     })
     let stdout = ''
     let stderr = ''
-    proc.stdout.on('data', chunk => (stdout += chunk))
-    proc.stderr.on('data', chunk => (stderr += chunk))
-    proc.on('error', error =>
+    proc.stdout?.on('data', (chunk: Buffer) => (stdout += chunk))
+    proc.stderr?.on('data', (chunk: Buffer) => (stderr += chunk))
+    proc.on('error', (error: Error) =>
       resolve({ status: 1, stdout, stderr: String(error) }),
     )
-    proc.on('close', status => resolve({ status, stdout, stderr }))
+    proc.on('close', (status: number | null) =>
+      resolve({ status: status ?? 1, stdout, stderr }),
+    )
   })
 
 /** The probe profile: created from the shipped web template, never the live one. */
@@ -230,7 +234,7 @@ async function boot() {
     }, 60_000)
     const onData = chunk => {
       out += chunk
-      const m = /dsh web: (https?:\/\/[^\s]+)/.exec(out)
+      const m = /dsh web: (https?:\/\/\S+)/.exec(out)
       if (!m) {
         return
       }
@@ -295,7 +299,9 @@ if (flag('--no-browser')) {
   // plugin-controlled string cannot break out of the script element.
   const boot =
     /globalThis\["__DSH_BOOT__"\]\s*=\s*([\s\S]*?)\s*<\/script>/.exec(html)
-  const graph = (boot?.[1] ?? '').replace(/&amp;/g, '&').replace(/&quot;/g, '"')
+  const graph = (boot?.[1] ?? '')
+    .replaceAll('&amp;', '&')
+    .replaceAll('&quot;', '"')
   process.stdout.write(
     `shell       : ${res.status} ${res.headers.get('content-type') ?? ''} ${html.length} bytes\n`,
   )
@@ -330,7 +336,7 @@ if (flag('--no-browser')) {
         ...html.matchAll(
           /["']((?:plugins|\/plugins)\/[^"']+client\.js[^"']*)["']/g,
         ),
-      ].map(m => m[1].replace(/&amp;/g, '&').replace(/&quot;/g, '"')),
+      ].map(m => m[1].replaceAll('&amp;', '&').replaceAll('&quot;', '"')),
     ),
   ]
   process.stdout.write(`bundle urls : ${urls.length}\n`)
@@ -421,7 +427,7 @@ try {
   // The shell renders before the mux socket finishes its token exchange; give it a
   // moment, then describe what we actually got instead of asserting a selector we
   // guessed.
-  await page.waitForTimeout(4_000)
+  await page.waitForTimeout(4000)
 
   // Scenarios exist because "the flag flipped" is not the same answer as "the
   // privileged surface behaves". Discovery first: click the entry and report the
@@ -442,7 +448,7 @@ try {
       el.click()
       return true
     })
-    await page.waitForTimeout(2_500)
+    await page.waitForTimeout(2500)
     const controls = await page.evaluate(() =>
       [
         ...document.querySelectorAll(
@@ -450,7 +456,7 @@ try {
         ),
       ]
         .map(e => ({
-          t: (e.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 40),
+          t: (e.textContent ?? '').replaceAll(/\s+/g, ' ').trim().slice(0, 40),
           r: e.getAttribute('role') ?? e.tagName,
         }))
         .filter(x => x.t),
@@ -481,7 +487,7 @@ try {
     const themeState = () =>
       page.evaluate(() => ({
         cls: document.documentElement.className,
-        theme: document.documentElement.getAttribute('data-theme'),
+        theme: document.documentElement.dataset.theme,
         scheme: getComputedStyle(document.documentElement).colorScheme,
         bg: getComputedStyle(document.body).backgroundColor,
         buttons: [...document.querySelectorAll('button')]
@@ -495,18 +501,18 @@ try {
       }))
 
     process.stdout.write(`open settings: ${await clickText('Settings')}\n`)
-    await page.waitForTimeout(2_000)
+    await page.waitForTimeout(2000)
     process.stdout.write(
       `before       : ${JSON.stringify(await themeState())}\n`,
     )
     process.stdout.write(`click DARK   : ${await clickText('Dark')}\n`)
-    await page.waitForTimeout(2_500)
+    await page.waitForTimeout(2500)
     process.stdout.write(
       `after click  : ${JSON.stringify(await themeState())}\n`,
     )
     await page.screenshot({ path: path.join(SHOTS, `${SHOT}-after-dark.png`) })
     await page.reload({ waitUntil: 'domcontentloaded' })
-    await page.waitForTimeout(5_000)
+    await page.waitForTimeout(5000)
     process.stdout.write(
       `after reload : ${JSON.stringify(await themeState())}\n`,
     )
@@ -622,7 +628,7 @@ try {
       }
     })
     // The rewrite is the point of this scenario, so it has to fail the run when it stops working.
-    if (probe.enterEvents.length !== 0) {
+    if (probe.enterEvents.length > 0) {
       problems.push(
         `the plain Enter reached the document: ${JSON.stringify(probe.enterEvents)}`,
       )
@@ -648,8 +654,10 @@ try {
     title: document.title,
     bodyLength: document.body?.innerHTML.length ?? 0,
     // Plugins under test report through body.dataset (see packages/privileged-ui).
-    dataset: { ...(document.body?.dataset ?? {}) },
-    text: (document.body?.innerText ?? '').replace(/\s+/g, ' ').slice(0, 300),
+    dataset: { ...document.body?.dataset },
+    text: (document.body?.innerText ?? '')
+      .replaceAll(/\s+/g, ' ')
+      .slice(0, 300),
   }))
   const shot = path.join(SHOTS, `${SHOT}.png`)
   await page.screenshot({ path: shot, fullPage: false })
@@ -660,8 +668,8 @@ try {
       `dataset     : ${JSON.stringify(facts.dataset)}`,
       `visible text: ${facts.text}`,
       `screenshot  : ${shot}`,
-      `problems    : ${problems.length ? '\n  ' + problems.join('\n  ') : 'none'}`,
-      `console log : ${console_all.length ? '\n  ' + console_all.slice(-25).join('\n  ') : 'none'}`,
+      `problems    : ${problems.length > 0 ? '\n  ' + problems.join('\n  ') : 'none'}`,
+      `console log : ${console_all.length > 0 ? '\n  ' + console_all.slice(-25).join('\n  ') : 'none'}`,
     ].join('\n') + '\n',
   )
   completed = true

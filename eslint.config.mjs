@@ -1,12 +1,9 @@
-// Deliberately one rule: every control body gets braces. The shared configs bring whole rule
-// sets, and adopting those is a separate decision from fixing the braces.
-import tseslint from 'typescript-eslint'
+// The shared config, plus the trees that are not ours to lint. eslint, unlike prettier, does not
+// read .gitignore — so the state directory (a browser cache, a pristine dsh copy, skills) and the
+// local helpers have to be named here or they get linted.
+import config from '@1stg/eslint-config'
 
-export default tseslint.config(
-  { ignores: ['packages/*/lib/**', 'node_modules/**', '.tasks/**'] },
-  {
-    files: ['**/*.ts', '**/*.mts', '**/*.mjs'],
-    languageOptions: { parser: tseslint.parser },
-    rules: { curly: ['error', 'all'] },
-  },
-)
+export default [
+  { ignores: ['packages/*/lib/**', '.dsh/**', '.tasks/**', 'node_modules/**'] },
+  ...config,
+]

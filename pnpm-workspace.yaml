@@ -2,3 +2,5 @@
 # workspace is purely for the companion plugins under packages/ — see README.
 packages:
   - packages/*
+allowBuilds:
+  unrs-resolver: set this to true or false
