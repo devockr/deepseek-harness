@@ -57,10 +57,15 @@ window.__ModuleLoader__.load({
           event.ctrlKey ||
           event.metaKey ||
           event.altKey
-        )
+        ) {
           return
-        if (event.isComposing || event.keyCode === 229) return // mid-IME
-        if (!window.matchMedia('(pointer: coarse)').matches) return
+        }
+        if (event.isComposing || event.keyCode === 229) {
+          return
+        } // mid-IME
+        if (!window.matchMedia('(pointer: coarse)').matches) {
+          return
+        }
         // Only the composer's own editor: the same rewrite on a plain input (the session
         // search) or the terminal's textarea would break them, and the patch this replaces
         // lived inside the composer's handler, so that is the scope it had.
@@ -76,7 +81,9 @@ window.__ModuleLoader__.load({
               (node.getAttribute('contenteditable') === 'true' ||
                 node.getAttribute('contenteditable') === ''),
           )
-        if (editable === undefined) return
+        if (editable === undefined) {
+          return
+        }
         event.stopPropagation()
         event.preventDefault()
         // A synthetic keydown never produces the browser's own line break — untrusted events
@@ -106,7 +113,9 @@ window.__ModuleLoader__.load({
      */
     async function rewriteHomeScreenIcon(): Promise<Disposable> {
       const link = document.querySelector('link[rel~="icon"]')
-      if (!(link instanceof HTMLLinkElement)) return () => {}
+      if (!(link instanceof HTMLLinkElement)) {
+        return () => {}
+      }
       const source = await (await fetch(link.href)).text()
       const svg = source
         .replace(/(<path[^>]*)fill="#[0-9A-Fa-f]{3,6}"/g, '$1fill="#FFFFFF"')
@@ -129,7 +138,9 @@ window.__ModuleLoader__.load({
       canvas.width = SIZE
       canvas.height = SIZE
       const context = canvas.getContext('2d')
-      if (context === null) return () => {}
+      if (context === null) {
+        return () => {}
+      }
       context.drawImage(image, 0, 0, SIZE, SIZE)
       const icon = document.createElement('link')
       icon.rel = 'apple-touch-icon'
