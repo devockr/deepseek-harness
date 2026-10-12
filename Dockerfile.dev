@@ -1,5 +1,6 @@
-# The dev image: everything the published image is built from, plus the shared libraries
-# chrome-headless-shell links. It is a separate file on purpose — the deployment build must never
+# The dev image: everything the published image is built from, plus the shared libraries the
+# browsers link — the headless shell's set, and the three the full Chromium adds on top of it.
+# It is a separate file on purpose — the deployment build must never
 # pick these up by accident — and it is built from Dockerfile's `base` target instead of the
 # published image, so it does not depend on the plugins being published.
 #
