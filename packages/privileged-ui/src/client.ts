@@ -74,17 +74,25 @@ window.__ModuleLoader__.load({
       // this plugin activated. The settings pages read these facts, so writing them reaches every
       // reader that has not cached the value itself — and the marker below still reports that the
       // gateway had it wrong, so the regression is visible rather than quietly papered over.
+      let repaired = false
       if (connection.isLoopback === true && host === false && facts !== undefined) {
         try {
           ;(facts as { isLoopback?: boolean }).isLoopback = true
+          repaired = true
         } catch {}
       }
       mark(visible ? state : 'SELF-CHECK-FAILED ' + state)
-      // cordis's own teardown: the effect body returns what undoes it.
+      // cordis's own teardown: the effect body returns what undoes it — including the facts above,
+      // or a dropped package would leave the pages it privileged still privileged.
       ctx.effect(() => () => {
         try {
           connection.isLoopback = before
         } catch {}
+        if (repaired) {
+          try {
+            ;(facts as { isLoopback?: boolean }).isLoopback = host
+          } catch {}
+        }
       })
     }
 
