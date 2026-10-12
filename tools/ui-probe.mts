@@ -326,7 +326,7 @@ if (flag('--no-browser')) {
   const html = await res.text()
   // The shell injects it as globalThis["__DSH_BOOT__"], with `<` and `&` escaped so a
   // plugin-controlled string cannot break out of the script element.
-  const boot = /globalThis\["__DSH_BOOT__"\]\s*=\s*([\s\S]*?)<\/script>/.exec(
+  const boot = /globalThis\["__DSH_BOOT__"\]\s*=\s*(\S[\s\S]*?)<\/script>/.exec(
     html,
   )
   const graph = (boot?.[1] ?? '')
@@ -380,9 +380,8 @@ if (flag('--no-browser')) {
     process.stdout.write(`bundle for ${wanted}: ${served ? 'yes' : 'NO'}\n`)
   }
   for (const u of urls) {
-    const target = u.startsWith('http')
-      ? u
-      : origin + (u.startsWith('/') ? '' : '/') + u
+    const separator = u.startsWith('/') ? '' : '/'
+    const target = u.startsWith('http') ? u : origin + separator + u
     const res = await fetch(target)
     if (res.status >= HTTP_BAD_REQUEST) {
       failed = true
@@ -471,7 +470,7 @@ try {
           'button, a, [role="button"], [role="tab"], li, span, div',
         ),
       ]
-      const el = all.reverse().find(e => e.textContent.trim() === 'Settings')
+      const el = all.findLast(e => e.textContent.trim() === 'Settings')
       if (!el) {
         return false
       }
@@ -513,8 +512,7 @@ try {
           ),
         ]
 
-        all.reverse()
-        const el = all.find(e => e.textContent.trim() === t)
+        const el = all.findLast(e => e.textContent.trim() === t)
         if (!el) {
           return false
         }
@@ -696,7 +694,7 @@ try {
 
   const facts = await page.evaluate(() => ({
     title: document.title,
-    bodyLength: document.body.innerHTML.length ?? 0,
+    bodyLength: document.body.innerHTML.length,
     // Plugins under test report through body.dataset (see packages/privileged-ui).
     dataset: { ...document.body.dataset },
     text: document.body.textContent

@@ -122,6 +122,8 @@ globalThis.__ModuleLoader__.load({
       if (!(link instanceof HTMLLinkElement)) {
         // Nothing was installed, so there is nothing to undo.
 
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+
         return () => {}
       }
       const response = await fetch(link.href)
@@ -149,6 +151,8 @@ globalThis.__ModuleLoader__.load({
       const context = canvas.getContext('2d')
       if (context === null) {
         // Nothing was installed, so there is nothing to undo.
+
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
 
         return () => {}
       }

@@ -12,4 +12,11 @@ export default [
     files: ['tools/**'],
     rules: { 'n/no-process-exit': 'off', 'n/hashbang': 'off' },
   },
+  {
+    // The client halves are plain scripts with no imports, so the one name they need must be
+    // global; restricted-syntax forbids an alias that only renames a type, which is exactly the
+    // shape that puts `Context` into that global scope. The alias is the point here.
+    files: ['packages/*/src/globals.d.ts'],
+    rules: { 'no-restricted-syntax': 'off' },
+  },
 ]
