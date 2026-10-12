@@ -32,9 +32,13 @@ RUN groupadd app && useradd -m -g app -s /bin/bash app
 # built from this file's `base` target and tagged separately (see "Images" in AGENTS.md):
 #   docker build --target base -t deepseek-harness-dsh:base .
 #   docker build -f Dockerfile.dev -t deepseek-harness-dsh:dev .
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Named caches, like npm_cache: the archives and lists persist across builds, and a cache mount
+# is not part of the layer — which is why the cleanup that used to follow is gone instead of
+# moved: it would empty the cache on every build.
+RUN --mount=type=cache,id=apt_cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt_lists,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
       bash ca-certificates curl git openssh-client util-linux \
- && rm -rf /var/lib/apt/lists/*
 
 # Where the build fetches dsh and pnpm from. The compose file passes the host's
 # NPM_REGISTRY through when it is set, so this default covers an unset variable and
