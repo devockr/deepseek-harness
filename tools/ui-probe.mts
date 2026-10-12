@@ -57,8 +57,9 @@ const isLoopback = (host: string): boolean =>
   host === '[::1]' ||
   host.startsWith('127.')
 
-// Named so the numbers say what they are: waits are for the UI to settle, and the slices are
-// how much of a long value is worth printing in a failure report.
+// Named so the numbers say what they are: waits are for the UI to settle, and the slices are how
+// much of a long value is worth printing. Numbers inside a page.evaluate stay literal — that code
+// runs in the browser and cannot see these.
 const READINESS_TIMEOUT_MS = 60_000
 const HTTP_SEE_OTHER = 303
 const HTTP_BAD_REQUEST = 400
@@ -69,9 +70,6 @@ const WAIT_FOR_SETTLE_MS = 5000
 const CONTEXT_BEFORE_CHARS = 60
 const CONTEXT_AFTER_CHARS = 160
 const HTML_HEAD_CHARS = 200
-const TEXT_EXCERPT_CHARS = 40
-const PARAM_EXCERPT_CHARS = 70
-const REPORT_EXCERPT_CHARS = 300
 const LOG_TAIL_LINES = 25
 const OUTPUT_TAIL_CHARS = 400
 // A throwaway state directory under the system temp is the point: it is ours to delete, and
@@ -490,7 +488,9 @@ try {
           t: e.textContent
             .replaceAll(/\s+/g, ' ')
             .trim()
-            .slice(0, TEXT_EXCERPT_CHARS),
+            // Runs inside the page, so it cannot see this module's constants.
+            // eslint-disable-next-line @typescript-eslint/no-magic-numbers
+            .slice(0, 40),
           r: e.getAttribute('role') ?? e.tagName,
         }))
         .filter(x => x.t),
@@ -574,7 +574,9 @@ try {
         attrs: [...el.attributes]
           .map(
             a =>
-              `${a.name}=${JSON.stringify(a.value.slice(0, PARAM_EXCERPT_CHARS))}`,
+              // Runs inside the page, so it cannot see this module's constants.
+              // eslint-disable-next-line @typescript-eslint/no-magic-numbers
+              `${a.name}=${JSON.stringify(a.value.slice(0, 70))}`,
           )
           .join(' '),
       })),
@@ -699,7 +701,9 @@ try {
     dataset: { ...document.body.dataset },
     text: document.body.textContent
       .replaceAll(/\s+/g, ' ')
-      .slice(0, REPORT_EXCERPT_CHARS),
+      // Runs inside the page, so it cannot see this module's constants.
+      // eslint-disable-next-line @typescript-eslint/no-magic-numbers
+      .slice(0, 300),
   }))
   const shot = path.join(SHOTS, `${SHOT}.png`)
   await page.screenshot({ path: shot, fullPage: false })
