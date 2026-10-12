@@ -32,16 +32,16 @@ RUN groupadd app && useradd -m -g app -s /bin/bash app
 # built from this file's `base` target and tagged separately (see "Images" in AGENTS.md):
 #   docker build --target base -t deepseek-harness-dsh:base .
 #   docker build -f Dockerfile.dev -t deepseek-harness-dsh:dev .
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      bash ca-certificates curl git openssh-client util-linux \
- && rm -rf /var/lib/apt/lists/*
+# Named caches, like npm_cache: the archives and lists persist across builds, and a cache mount
+# is not part of the layer — which is why the cleanup that used to follow is gone instead of
+# moved: it would empty the cache on every build.
+RUN --mount=type=cache,id=apt_cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,id=apt_lists,target=/var/lib/apt/lists,sharing=locked \
+  rm -f /etc/apt/apt.conf.d/docker-clean \
+   && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache \
+   && apt-get update && apt-get install -y --no-install-recommends \
+  bash ca-certificates curl git openssh-client util-linux
 
-# Where the build fetches dsh and pnpm from. The compose file passes the host's
-# NPM_REGISTRY through when it is set, so this default covers an unset variable and
-# a bare `docker build .`. Handed to npm as a flag rather than written into the
-# image's npm config: the runtime registry is entrypoint.sh's business. Keep both
-# pins on the RUN line below — renovate's regex reads `npm install -g` to its end.
-ARG NPM_REGISTRY=https://registry.npmmirror.com/
 
 # Install the CLI globally (as root, so it can write to the global prefix).
 # The web profile's HMR service requires Node's --expose-internals flag, which
@@ -53,7 +53,8 @@ ARG NPM_REGISTRY=https://registry.npmmirror.com/
 # pnpm is in the same install because the plugin manager drives it and has no npm
 # fallback, and because it must resolve from the image's PATH: the in-app installer
 # spawns it with a scrubbed environment, so a user-prefix install is invisible.
-RUN --mount=type=cache,id=npm_cache,target=/root/.npm npm install -g --registry="$NPM_REGISTRY" @deepseek-ai/dsh@0.2.0-rc.2 pnpm@12.11.2
+RUN --mount=type=cache,id=npm_cache,target=/root/.npm \
+  npm install -g --registry="$NPM_REGISTRY" @deepseek-ai/dsh@0.2.0-rc.2 pnpm@12.11.2
 
 # This image used to patch dsh's installed JavaScript here: the loopback gate the
 # settings page hides behind, the touch CSS, the home-screen icon, and the composer's
@@ -88,8 +89,8 @@ FROM base
 ARG NPM_REGISTRY=https://registry.npmmirror.com/
 
 RUN mkdir -p /opt/dsh/home \
- && export HOME=/opt/dsh/home \
- && printf 'registry=%s\n' "$NPM_REGISTRY" > "$HOME/.npmrc" \
- && dsh web --dump-config >/dev/null \
- && dsh plugin --profile web add @idsh/remote-access@0.1.0 \
- && test -f /opt/dsh/home/.dsh/profiles/web/package.json
+  && export HOME=/opt/dsh/home \
+  && printf 'registry=%s\n' "$NPM_REGISTRY" > "$HOME/.npmrc" \
+  && dsh web --dump-config > /dev/null \
+  && dsh plugin --profile web add @idsh/remote-access@0.1.0 \
+  && test -f /opt/dsh/home/.dsh/profiles/web/package.json

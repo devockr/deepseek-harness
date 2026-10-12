@@ -14,7 +14,7 @@
 //
 // This is deliberately an exception to a designed boundary. Read the package README
 // before installing it.
-window.__ModuleLoader__.load({
+globalThis.__ModuleLoader__.load({
   id: '@idsh/privileged-ui',
   factory: () => {
     const module: { exports: Record<string, unknown> } = { exports: {} }
@@ -68,16 +68,17 @@ window.__ModuleLoader__.load({
       // undefined, which is not judged.
       const facts = services.remote?.$host
       const host = facts?.isLoopback
-      const state = 'connection:' + before + '->' + connection.isLoopback + ' host:' + host
-      const visible = connection.isLoopback === true && host !== false
+      const state =
+        'connection:' + before + '->' + connection.isLoopback + ' host:' + host
+      const visible = host !== false
       // The one ordering outcome that is still repairable: a live gateway that copied `false` before
       // this plugin activated. The settings pages read these facts, so writing them reaches every
       // reader that has not cached the value itself — and the marker below still reports that the
       // gateway had it wrong, so the regression is visible rather than quietly papered over.
       let repaired = false
-      if (connection.isLoopback === true && host === false && facts !== undefined) {
+      if (host === false && facts !== undefined) {
         try {
-          ;(facts as { isLoopback?: boolean }).isLoopback = true
+          facts.isLoopback = true
           repaired = true
         } catch {}
       }

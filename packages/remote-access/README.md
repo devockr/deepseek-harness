@@ -1,6 +1,6 @@
 ---
 description: "Reach a dsh Web profile from another machine: bind every interface and keep the UI's Remote-mux WebSocket alive across a flaky or proxied link."
-kind: "package-bundle"
+kind: 'package-bundle'
 ---
 
 # @idsh/remote-access
@@ -55,7 +55,7 @@ configuration dsh leaves to you. This package covers both.
 **The host has to be dialable.** Binding every interface is enough whenever the
 host already has an address a browser can reach — a public IPv6 address with the
 firewall opened, a forwarded port, a relay in front — and it is also what lets a
-browser on the same network in. It is *not* what gets you through NAT: if the host
+browser on the same network in. It is _not_ what gets you through NAT: if the host
 has no dialable address, put a reverse tunnel in front instead.
 [`@froststarinquire/dsh-remote-access-web`](https://github.com/wikkd/dsh-remote-access-web)
 publishes one (frp-based, MIT). It is a different layer, not a replacement: a
@@ -71,23 +71,22 @@ little slack that a Wi-Fi roam, a GC pause, a route flap or a proxy hiccup drops
 for no real reason. The 30-second interval came out of exactly that — a `dsh web`
 deployment reached over the public internet from another city.
 
-
 ## A side effect worth knowing: the directory picker
 
 `dsh-host-directory-picker-auto` resolves the directory-picking interaction once at
 boot: `native` requires a **loopback-only bind**, a non-SSH launch and a servable
-display session, and *anything ambiguous resolves to `browse`*. Binding every
+display session, and _anything ambiguous resolves to `browse`_. Binding every
 interface therefore lands on the in-app browse dialog, which works for a remote
 operator — so "Add workspace" keeps working. A loopback-bind tunnel deployment does
 not get this for free and has to pin the picker explicitly.
 
 ## What it changes
 
-| | Shipped default | With this bundle |
-|---|---|---|
-| `webserver.host` | `127.0.0.1` | `0.0.0.0` (all interfaces) |
-| ping interval on the Remote mux | 2000ms | 30000ms |
-| tolerated stall before that socket is terminated | ~4-6s | ~60-90s |
+|                                                  | Shipped default | With this bundle           |
+| ------------------------------------------------ | --------------- | -------------------------- |
+| `webserver.host`                                 | `127.0.0.1`     | `0.0.0.0` (all interfaces) |
+| ping interval on the Remote mux                  | 2000ms          | 30000ms                    |
+| tolerated stall before that socket is terminated | ~4-6s           | ~60-90s                    |
 
 `webserver.port`, `compression`, `compressionLevel` and
 `compressionThresholdBytes` are restated exactly as shipped, because a patch
@@ -97,7 +96,7 @@ genuinely gone is still detected — just later.
 ## Read this before you bind every interface
 
 - **The trust fence widens with the bind.** dsh samples the network once at boot: a
-  loopback bind derives no LAN addresses, while an all-interfaces bind adds *every*
+  loopback bind derives no LAN addresses, while an all-interfaces bind adds _every_
   non-internal IPv4 literal to the `/api` browser-trust fence, and the LAN URL it
   prints matches that fence. Binding all interfaces therefore trusts every LAN
   address, not just yours. Adding `--trusted-host <authority>` (a hostname, a
@@ -118,15 +117,15 @@ values does not have to change or remove this package:
 ```yaml
 # <profile>/cordis.patch.yml
 - id: webserver
-  name: "@deepseek-ai/dsh-host-webserver"
+  name: '@deepseek-ai/dsh-host-webserver'
   config:
-    host: "0.0.0.0"
+    host: '0.0.0.0'
     port: !!js ctx.webStartup.port ?? 3080
     compression: gzip
     compressionLevel: 1
     compressionThresholdBytes: 1024
 - id: typert-gateway
-  name: "@deepseek-ai/dsh-api-gateway"
+  name: '@deepseek-ai/dsh-api-gateway'
   config:
     websocketHeartbeatIntervalMs: 120000
 ```

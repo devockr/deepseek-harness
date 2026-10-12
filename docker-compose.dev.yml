@@ -1,0 +1,21 @@
+# Dev overlay: the browser settings, for running the `:dev` image.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --no-build
+#
+# Neither variable does anything in the published image, which has no browser libraries on purpose.
+services:
+  dsh:
+    # Built only by `pnpm dev`, which rebuilds :base first. Never built or pulled from here:
+    # building the overlay would let a stale :base into a :dev that looks freshly built, and a
+    # missing image would silently come from a registry instead of failing.
+    image: deepseek-harness-dsh:dev
+    pull_policy: never
+    build: !reset null
+    environment:
+      # Where the browsers live. They are in no image, and this path is inside the state
+      # directory, so a container rebuild re-uses them instead of downloading them again.
+      - PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH:-/home/app/.dsh/cache/ms-playwright}
+      # Browser binaries come from Playwright's CDN, which is slow on some networks. This is the
+      # public npmmirror of the same builds — the host NPM_REGISTRY already defaults to in both
+      # Dockerfiles. Point it elsewhere, or drop the line, if you prefer.
+      - PLAYWRIGHT_DOWNLOAD_HOST=${PLAYWRIGHT_DOWNLOAD_HOST:-https://cdn.npmmirror.com/binaries/playwright}

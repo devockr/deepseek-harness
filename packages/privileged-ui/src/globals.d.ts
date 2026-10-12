@@ -1,3 +1,4 @@
+/// <reference types="typed-query-selector" />
 // The two globals a client bundle is written against, taken from dsh's own published declarations
 // rather than restated here: a change to either then shows up as a build failure instead of drifting
 // quietly. Nothing in this file reaches the bundle — it is a declaration file, so it emits nothing,
@@ -13,8 +14,15 @@ declare global {
       load(module: ClientBundleRegistration): void
     }
   }
+  // The same object, declared as a global binding so a bundle written against `globalThis`
+  // type-checks too — in a browser the two are the same thing.
+  var __ModuleLoader__: {
+    load(module: ClientBundleRegistration): void
+  }
   /** The plugin context, as dsh's own client plugins type it: `Context` plus the client services. */
+
   type PluginContext = Context
+
   /** What a contribution returns so it can undo itself. */
   type Disposable = () => void
 }

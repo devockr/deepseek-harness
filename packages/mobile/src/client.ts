@@ -4,7 +4,7 @@
 // files at build time: two CSS rules injected into dist/index.html, a rewritten
 // dist/favicon.svg, and a sed-injected branch inside the composer's keydown handler.
 // Doing them here means the image can ship an untouched dsh and install a package.
-window.__ModuleLoader__.load({
+globalThis.__ModuleLoader__.load({
   id: '@idsh/mobile',
   factory: () => {
     const module: { exports: Record<string, unknown> } = { exports: {} }
@@ -49,11 +49,29 @@ window.__ModuleLoader__.load({
      * shifted one in the capture phase, and the original is stopped before the composer's
      * handler ever sees it.
      */
+    /** The key code Safari uses for a composition being committed. */
+    const IME_PROCESSING_KEY_CODE = 229
+
     function rewriteEnterOnCoarsePointers(): Disposable {
       const onKeydown = (event: KeyboardEvent): void => {
-        if (event.key !== 'Enter' || event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return
-        if (event.isComposing || event.keyCode === 229) return // mid-IME
-        if (!window.matchMedia('(pointer: coarse)').matches) return
+        if (
+          event.key !== 'Enter' ||
+          event.shiftKey ||
+          event.ctrlKey ||
+          event.metaKey ||
+          event.altKey
+        ) {
+          return
+        }
+        // 229 is the IME processing key code Safari reports when a composition is being committed,
+        // and keyCode is the only place it appears — hence the deprecation suppression below.
+        // eslint-disable-next-line sonarjs/deprecation
+        if (event.isComposing || event.keyCode === IME_PROCESSING_KEY_CODE) {
+          return
+        } // mid-IME
+        if (!globalThis.matchMedia('(pointer: coarse)').matches) {
+          return
+        }
         // Only the composer's own editor: the same rewrite on a plain input (the session
         // search) or the terminal's textarea would break them, and the patch this replaces
         // lived inside the composer's handler, so that is the scope it had.
@@ -66,9 +84,12 @@ window.__ModuleLoader__.load({
           .find(
             (node): node is HTMLElement =>
               node instanceof HTMLElement &&
-              (node.getAttribute('contenteditable') === 'true' || node.getAttribute('contenteditable') === ''),
+              (node.getAttribute('contenteditable') === 'true' ||
+                node.getAttribute('contenteditable') === ''),
           )
-        if (editable === undefined) return
+        if (editable === undefined) {
+          return
+        }
         event.stopPropagation()
         event.preventDefault()
         // A synthetic keydown never produces the browser's own line break — untrusted events
@@ -76,7 +97,11 @@ window.__ModuleLoader__.load({
         // insertLineBreak command from beforeinput. Measured on the running editor: this adds
         // <br data-lexical-managed-linebreak> where a dispatched shift+Enter adds nothing.
         editable.dispatchEvent(
-          new InputEvent('beforeinput', { inputType: 'insertLineBreak', bubbles: true, cancelable: true }),
+          new InputEvent('beforeinput', {
+            inputType: 'insertLineBreak',
+            bubbles: true,
+            cancelable: true,
+          }),
         )
       }
       document.addEventListener('keydown', onKeydown, true)
@@ -94,13 +119,24 @@ window.__ModuleLoader__.load({
      */
     async function rewriteHomeScreenIcon(): Promise<Disposable> {
       const link = document.querySelector('link[rel~="icon"]')
-      if (!(link instanceof HTMLLinkElement)) return () => {}
-      const source = await (await fetch(link.href)).text()
+      if (!(link instanceof HTMLLinkElement)) {
+        // Nothing was installed, so there is nothing to undo.
+        // eslint-disable-next-line @typescript-eslint/no-empty-function -- the no-op is the point
+        return () => {}
+      }
+      const response = await fetch(link.href)
+      const source = await response.text()
       const svg = source
-        .replace(/(<path[^>]*)fill="#[0-9A-Fa-f]{3,6}"/g, '$1fill="#FFFFFF"')
+        .replaceAll(/(<path[^>]*)fill="#[0-9A-Fa-f]{3,6}"/g, '$1fill="#FFFFFF"')
         .replace(/(<svg[^>]*)viewBox="[^"]*"/, '$1viewBox="-7.83 -7.83 66 66"')
-        .replace(/(<svg[^>]*)width="[0-9.]+" height="[0-9.]+"/, '$1width="1024" height="1024"')
-        .replace(/<path/, '<rect x="-7.83" y="-7.83" width="66" height="66" rx="12" ry="12" fill="#4D6BFE"/><path')
+        .replace(
+          /(<svg[^>]*)width="[0-9.]+" height="[0-9.]+"/,
+          '$1width="1024" height="1024"',
+        )
+        .replace(
+          /<path/,
+          '<rect x="-7.83" y="-7.83" width="66" height="66" rx="12" ry="12" fill="#4D6BFE"/><path',
+        )
       const image = new Image()
       image.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
       await image.decode()
@@ -111,7 +147,11 @@ window.__ModuleLoader__.load({
       canvas.width = SIZE
       canvas.height = SIZE
       const context = canvas.getContext('2d')
-      if (context === null) return () => {}
+      if (context === null) {
+        // Nothing was installed, so there is nothing to undo.
+        // eslint-disable-next-line @typescript-eslint/no-empty-function -- the no-op is the point
+        return () => {}
+      }
       context.drawImage(image, 0, 0, SIZE, SIZE)
       const icon = document.createElement('link')
       icon.rel = 'apple-touch-icon'
@@ -121,11 +161,17 @@ window.__ModuleLoader__.load({
     }
 
     function apply(ctx: PluginContext): void {
-      const teardown: Disposable[] = [injectCss(), rewriteEnterOnCoarsePointers()]
+      const teardown: Disposable[] = [
+        injectCss(),
+        rewriteEnterOnCoarsePointers(),
+      ]
       let disposed = false
-      mark('css+enter coarse:' + window.matchMedia('(pointer: coarse)').matches)
+      mark(
+        'css+enter coarse:' +
+          globalThis.matchMedia('(pointer: coarse)').matches,
+      )
       rewriteHomeScreenIcon()
-        .then((off) => {
+        .then(off => {
           // The icon arrives a fetch later, so a dispose that already happened has to undo it
           // here: the teardown list was drained and would never see this one.
           if (disposed) {
@@ -135,7 +181,9 @@ window.__ModuleLoader__.load({
           teardown.push(off)
           mark(state + ' icon:ok')
         })
-        .catch((error: unknown) => mark(state + ' icon:' + (error as Error).message))
+        .catch((error: unknown) =>
+          mark(state + ' icon:' + (error as Error).message),
+        )
       // cordis's own teardown: the effect body returns what undoes it.
       ctx.effect(() => () => {
         disposed = true

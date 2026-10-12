@@ -2,3 +2,7 @@
 # workspace is purely for the companion plugins under packages/ — see README.
 packages:
   - packages/*
+allowBuilds:
+  unrs-resolver: false
+minimumReleaseAgeExclude:
+  - '@1stg/eslint-config@10.3.2'

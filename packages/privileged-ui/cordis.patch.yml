@@ -3,4 +3,4 @@
 # `dsh.client` declaration in package.json.
 - insert:
     - id: privileged-ui
-      name: "@idsh/privileged-ui"
+      name: '@idsh/privileged-ui'

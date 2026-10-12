@@ -3,4 +3,4 @@
 # `dsh.client` declaration in package.json.
 - insert:
     - id: mobile
-      name: "@idsh/mobile"
+      name: '@idsh/mobile'
