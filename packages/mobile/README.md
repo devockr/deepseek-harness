@@ -77,6 +77,8 @@ Both fixes are also confirmed on a real iPhone: the home-screen shortcut shows t
 with the white glyph, a plain Enter in the composer inserts a line break instead of sending,
 and a plain Enter still reaches the session-search input untouched.
 
-The probe's mobile scenario covers the CSS and the marker (`node tools/ui-probe.mts --scenario
-mobile`); its Enter assertion still dispatches the keydown this package no longer sends, so
-that scenario needs updating before it can be read as a verdict on the rewrite.
+`node tools/ui-probe.mts --scenario mobile` asserts all of it: the plain Enter never reaches
+the document (`enterEvents: []`), both `contenteditable` spellings are sent
+`insertLineBreak` (`insertedBreaks`), the session-search input keeps its own Enter, and a
+regression on any of those lands in `problems` — checked by pointing the scenario at a build
+that still dispatches the old shift+Enter, where those three assertions fail.

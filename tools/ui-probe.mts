@@ -442,22 +442,33 @@ try {
       }
       input.remove()
 
-      // A plain Enter inside an editable must arrive as a shifted one, and must not reach
-      // the document in its original form: the recorder sits in the bubble phase, the
-      // plugin's rewrite in the capture phase.
-      const seen = []
-      const record = (e) => seen.push(`${e.key}${e.shiftKey ? '+shift' : ''}`)
+      // A plain Enter inside an editable must be stopped, and the plugin must then drive the
+      // editor's line break the way the editor accepts it: a `beforeinput` with
+      // `inputType: insertLineBreak`, which is what Lexical's insertLineBreak command runs from.
+      // A dispatched keyboard event cannot do this — untrusted events have no default behaviour —
+      // so the recorder watches for that instead of for a rewritten keydown.
+      const enterEvents = []
+      const record = (e) => enterEvents.push(`${e.key}${e.shiftKey ? '+shift' : ''}`)
       document.addEventListener('keydown', record)
-      const editable = document.createElement('div')
-      editable.setAttribute('contenteditable', 'true')
-      editable.style.cssText = 'position:fixed;left:-9999px;top:0'
-      document.body.append(editable)
-      editable.focus()
-      editable.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true }),
-      )
+      // The composer writes `contenteditable=""`; the `"true"` spelling is what other clients use,
+      // so the composedPath lookup has to cover both.
+      const insertedBreaks = []
+      const editables = ['', 'true'].map((value) => {
+        const editable = document.createElement('div')
+        editable.setAttribute('contenteditable', value)
+        editable.style.cssText = 'position:fixed;left:-9999px;top:0'
+        editable.addEventListener('beforeinput', (e) => insertedBreaks.push(e.inputType))
+        document.body.append(editable)
+        editable.focus()
+        editable.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true }),
+        )
+        return editable
+      })
       document.removeEventListener('keydown', record)
-      editable.remove()
+      for (const editable of editables) {
+        editable.remove()
+      }
 
       // And the other way round: a plain input (the session search) keeps its own Enter.
       const inputSeen = []
@@ -476,13 +487,24 @@ try {
       return {
         coarse: matchMedia('(pointer: coarse)').matches,
         css,
-        enterEvents: seen,
+        enterEvents,
+        insertedBreaks,
         inputEvents: inputSeen,
-        composerEditables: document.querySelectorAll('[contenteditable="true"]').length,
+        composerEditables: document.querySelectorAll('[contenteditable]').length,
         marker: document.body.dataset.idshMobile,
         appleTouchIcon: !!document.querySelector('link[rel="apple-touch-icon"]'),
       }
     })
+    // The rewrite is the point of this scenario, so it has to fail the run when it stops working.
+    if (probe.enterEvents.length !== 0) {
+      problems.push(`the plain Enter reached the document: ${JSON.stringify(probe.enterEvents)}`)
+    }
+    if (probe.insertedBreaks.length !== 2) {
+      problems.push(`the composer was not sent insertLineBreak twice: ${JSON.stringify(probe.insertedBreaks)}`)
+    }
+    if (probe.inputEvents.length !== 1 || probe.inputEvents[0] !== 'Enter') {
+      problems.push(`the session-search input lost its own Enter: ${JSON.stringify(probe.inputEvents)}`)
+    }
     process.stdout.write(`mobile probe : ${JSON.stringify(probe)}\n`)
     await page.screenshot({ path: path.join(SHOTS, `${SHOT}-mobile.png`) })
   }
