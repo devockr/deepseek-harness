@@ -25,19 +25,22 @@
 # why the checks that drive it set PLAYWRIGHT_BROWSERS_PATH.
 #
 # The library list is measured, not `playwright install-deps chromium`'s. That one also
-# serves *headed* Chromium, so it carries xvfb, five font packages, xfonts-scalable and the
-# pango/cairo/freetype/fontconfig stack (57MB of its 71MB); `ldd chrome-headless-shell` on a
-# clean bookworm asks for 21 sonames instead.
+# serves *headed* Chromium, so it carries xvfb, five font packages and xfonts-scalable on top
+# of most of this. The check here is `ldd` against the binaries themselves: the headless shell
+# asks for 21 sonames on a clean bookworm, and the full Chromium in `chromium-*/chrome-linux64`
+# asks for three the shell does not — libcups2, libcairo2, libpango-1.0-0.
 #
 # Nine names, not twenty-one: the other libs the browser links are hard dependencies of
 # these, so apt brings them along (libx11-6, libxext6, libxcb1, libglib2.0-0, libexpat1,
 # libdbus-1-3, libnspr4, libatk1.0-0, libatspi2.0-0 — `apt-cache depends --recurse` on the
 # nine covers all of them). libxfixes3 is explicit because nothing in bookworm depends on
-# it. There is no Debian meta-package for this set: the one-name shortcuts are both heavier
-# and incomplete (`chromium` drags a whole browser, `libgtk-3-0` drags GTK + pango + cairo
-# and still misses nss/nspr/asound/gbm). A font is not in that set for its own sake: without one,
-# Skia aborts the renderer the first time a page shapes text, which is every page, so
-# fonts-liberation and fontconfig's own configuration are installed below.
+# it, and the full Chromium's three are named for the same reason: their own chain
+# (harfbuzz, fribidi, thai, pixman, xcb-render/shm, avahi) follows from them. There is no
+# Debian meta-package for this set: the one-name shortcuts are both heavier and incomplete
+# (`chromium` drags a whole browser, `libgtk-3-0` drags GTK + pango + cairo and still misses
+# nss/nspr/asound/gbm). A font is not in that set for its own sake: without one, Skia aborts
+# the renderer the first time a page shapes text, which is every page, so fonts-liberation and
+# fontconfig's own configuration are installed below.
 ARG BASE=deepseek-harness-dsh:base
 FROM ${BASE}
 
