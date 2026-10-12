@@ -34,9 +34,13 @@ const flag = (name) => argv.includes(name)
 const values = (name) => {
   const found = []
   for (let index = 0; index < argv.length; index += 1) {
-    if (argv[index] !== name) continue
+    if (argv[index] !== name) {
+      continue
+    }
     const value = argv[index + 1]
-    if (value === undefined || value.startsWith('-')) throw new Error(`${name} needs a value`)
+    if (value === undefined || value.startsWith('-')) {
+      throw new Error(`${name} needs a value`)
+    }
     found.push(value)
     index += 1
   }
@@ -70,7 +74,9 @@ const dshArgv = (args) => (DSH.endsWith('.js') ? [process.execPath, ['--expose-i
 // that was already there is not ours to delete.
 let child
 const forget = async () => {
-  if (!KEEP && !HOME_EXISTED) await rm(HOME, { recursive: true, force: true })
+  if (!KEEP && !HOME_EXISTED) {
+    await rm(HOME, { recursive: true, force: true })
+  }
 }
 // Two layers, because they can do different things. "exit" cannot await, but kill() is
 // synchronous, so it terminates the child on every path — an unhandled rejection after boot
@@ -79,10 +85,16 @@ const forget = async () => {
 // next run clears it.
 let stopping = false
 const stop = async (error?: unknown) => {
-  if (stopping) return
+  if (stopping) {
+    return
+  }
   stopping = true
-  if (error !== undefined) console.error(error)
-  if (!KEEP) child?.kill('SIGTERM')
+  if (error !== undefined) {
+    console.error(error)
+  }
+  if (!KEEP) {
+    child?.kill('SIGTERM')
+  }
   // A failed cleanup is still a failure, and it must not keep the process alive: exit runs in a
   // finally so it happens either way.
   let status = error === undefined ? 0 : 1
@@ -96,7 +108,9 @@ const stop = async (error?: unknown) => {
   }
 }
 process.on('exit', () => {
-  if (!KEEP) child?.kill('SIGTERM')
+  if (!KEEP) {
+    child?.kill('SIGTERM')
+  }
 })
 process.on('SIGINT', () => void stop())
 process.on('SIGTERM', () => void stop())
@@ -189,7 +203,9 @@ async function boot() {
     const onData = (chunk) => {
       out += chunk
       const m = /dsh web: (https?:\/\/[^\s]+)/.exec(out)
-      if (!m) return
+      if (!m) {
+        return
+      }
       clearTimeout(timer)
       child.stdout.off('data', onData)
       const url = new URL(isLoopback(HOST) ? m[1] : m[1].replace(/\/\/[^/:]+/, `//${HOST}`))
@@ -227,7 +243,9 @@ if (flag('--no-browser')) {
     .map((c) => c.split(';')[0])
     .filter(Boolean)
     .join('; ')
-  if (exchange.status !== 303) failed = true
+  if (exchange.status !== 303) {
+    failed = true
+  }
   process.stdout.write(`token       : ${exchange.status} → cookie ${cookie ? `${cookie.length} bytes` : 'NONE'}\n`)
   const res = await fetch(`${origin}/`, { headers: { cookie } })
   const html = await res.text()
@@ -253,7 +271,9 @@ if (flag('--no-browser')) {
   for (const wanted of ['privileged-ui', 'mobile', 'remote-access']) {
     const expected = wanted !== 'remote-access'
     const found = graph.includes(wanted)
-    if (expected && !found) failed = true
+    if (expected && !found) {
+      failed = true
+    }
     process.stdout.write(
       `contains ${wanted}: ${found ? 'yes' : 'NO'}${expected ? '' : ' (server half, not in the client graph)'}\n`,
     )
@@ -270,13 +290,17 @@ if (flag('--no-browser')) {
   // that never made it into the composition would otherwise pass this mode silently.
   for (const wanted of ['privileged-ui', 'mobile']) {
     const served = urls.some((u) => u.includes(`@idsh/${wanted}/client.js`))
-    if (!served) failed = true
+    if (!served) {
+      failed = true
+    }
     process.stdout.write(`bundle for ${wanted}: ${served ? 'yes' : 'NO'}\n`)
   }
   for (const u of urls) {
     const target = u.startsWith('http') ? u : origin + (u.startsWith('/') ? '' : '/') + u
     const res = await fetch(target)
-    if (res.status >= 400) failed = true
+    if (res.status >= 400) {
+      failed = true
+    }
     process.stdout.write(`  ${res.status} ${res.headers.get('content-type') ?? ''} ${u}\n`)
   }
   if (KEEP) {
@@ -316,7 +340,9 @@ let completed = false
 const console_all = []
 page.on('console', (m) => {
   console_all.push(`[${m.type()}] ${m.text()}`)
-  if (m.type() === 'error') problems.push(`console: ${m.text()}`)
+  if (m.type() === 'error') {
+    problems.push(`console: ${m.text()}`)
+  }
 })
 page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`))
 // Name the failing URL: a bare "502" in the console says nothing about who answered.
@@ -337,7 +363,9 @@ try {
     const clicked = await page.evaluate(() => {
       const all = [...document.querySelectorAll('button, a, [role="button"], [role="tab"], li, span, div')]
       const el = all.reverse().find((e) => (e.textContent ?? '').trim() === 'Settings')
-      if (!el) return false
+      if (!el) {
+        return false
+      }
       el.click()
       return true
     })
@@ -358,7 +386,9 @@ try {
       page.evaluate((t) => {
         const all = [...document.querySelectorAll('button, a, [role="button"], [role="tab"], li, span, div')].reverse()
         const el = all.find((e) => (e.textContent ?? '').trim() === t)
-        if (!el) return false
+        if (!el) {
+          return false
+        }
         el.click()
         return true
       }, text)

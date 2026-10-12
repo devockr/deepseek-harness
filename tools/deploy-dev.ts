@@ -62,14 +62,18 @@ const docker = async (args: string[], extraEnv?: Record<string, string>): Promis
         }
       }
     }
-    if (!dockerBin) die('docker not found — run this on the host with docker on PATH, or set DOCKER=/path/to/docker')
+    if (!dockerBin) {
+      die('docker not found — run this on the host with docker on PATH, or set DOCKER=/path/to/docker')
+    }
   }
   return run(dockerBin, args, extraEnv)
 }
 
 // compose interpolates this with `:?`; an empty one produces a container that starts but cannot
 // reach the model, which is worse than one that does not start.
-if (!process.env.DEEPSEEK_API_KEY) die('DEEPSEEK_API_KEY is empty — it lives in a login shell; run this from one')
+if (!process.env.DEEPSEEK_API_KEY) {
+  die('DEEPSEEK_API_KEY is empty — it lives in a login shell; run this from one')
+}
 
 const files = ['docker-compose.yml', 'docker-compose.dev.yml']
 for (const file of files) {
