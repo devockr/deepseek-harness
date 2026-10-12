@@ -49,46 +49,44 @@ const stderrOf = (error: unknown): string => {
 
 // docker is not on every PATH this runs under — a login shell here has node and pnpm but not
 // /usr/local/bin — so resolve it: $DOCKER, then PATH, then the usual places.
+/** The first candidate that runs: on PATH, or the places a login shell may leave out. */
+const resolveDocker = async (): Promise<string> => {
+  const candidates = [
+    process.env.DOCKER,
+    'docker',
+    '/usr/local/bin/docker',
+    '/usr/bin/docker',
+    '/opt/bin/docker',
+  ].filter((candidate): candidate is string => typeof candidate === 'string')
+  for (const candidate of candidates) {
+    try {
+      await run(candidate, ['version'])
+      return candidate
+    } catch {
+      // not this one
+    }
+  }
+  for (const candidate of candidates) {
+    try {
+      await fs.access(candidate, fs.constants.X_OK)
+      return candidate
+    } catch {
+      // not this one either
+    }
+  }
+  return die(
+    'docker not found — run this on the host with docker on PATH, or set DOCKER=/path/to/docker',
+  )
+}
+
 let dockerBin: string | undefined
 const docker = async (
   args: string[],
   extraEnv?: Record<string, string>,
 ): Promise<string> => {
-  if (!dockerBin) {
-    const candidates = [
-      process.env.DOCKER,
-      'docker',
-      '/usr/local/bin/docker',
-      '/usr/bin/docker',
-      '/opt/bin/docker',
-    ].filter((candidate): candidate is string => typeof candidate === 'string')
-    for (const candidate of candidates) {
-      try {
-        await run(candidate, ['version'])
-        dockerBin = candidate
-        break
-      } catch {
-        // not this one
-      }
-    }
-    if (!dockerBin) {
-      for (const candidate of candidates) {
-        try {
-          await fs.access(candidate, fs.constants.X_OK)
-          dockerBin = candidate
-          break
-        } catch {
-          // not this one either
-        }
-      }
-    }
-    if (!dockerBin) {
-      die(
-        'docker not found — run this on the host with docker on PATH, or set DOCKER=/path/to/docker',
-      )
-    }
-  }
-  return run(dockerBin ?? die('docker not found'), args, extraEnv)
+  const bin = dockerBin ?? (await resolveDocker())
+  dockerBin = bin
+  return run(bin, args, extraEnv)
 }
 
 // compose interpolates this with `:?`; an empty one produces a container that starts but cannot

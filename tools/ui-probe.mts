@@ -319,8 +319,9 @@ if (flag('--no-browser')) {
   if (exchange.status !== HTTP_SEE_OTHER) {
     failed = true
   }
+  const cookieNote = cookie ? `${cookie.length} bytes` : 'NONE'
   process.stdout.write(
-    `token       : ${exchange.status} → cookie ${cookie ? `${cookie.length} bytes` : 'NONE'}\n`,
+    `token       : ${exchange.status} → cookie ${cookieNote}\n`,
   )
   const res = await fetch(`${origin}/`, { headers: { cookie } })
   const html = await res.text()
@@ -335,9 +336,8 @@ if (flag('--no-browser')) {
   process.stdout.write(
     `shell       : ${res.status} ${res.headers.get('content-type') ?? ''} ${html.length} bytes\n`,
   )
-  process.stdout.write(
-    `boot graph  : ${boot ? `${graph.length} bytes` : 'NOT FOUND'}\n`,
-  )
+  const graphNote = boot ? `${graph.length} bytes` : 'NOT FOUND'
+  process.stdout.write(`boot graph  : ${graphNote}\n`)
   if (!boot) {
     failed = true
     const at = html.search(/__DSH_BOOT__/)
@@ -495,8 +495,9 @@ try {
         }))
         .filter(x => x.t),
     )
+    const controlLines = controls.map(c => `  ${c.r} — ${c.t}`).join('\n')
     process.stdout.write(
-      `clicked settings: ${clicked}\ncontrols:\n${controls.map(c => `  ${c.r} — ${c.t}`).join('\n')}\n`,
+      `clicked settings: ${clicked}\ncontrols:\n${controlLines}\n`,
     )
     await page.screenshot({ path: path.join(SHOTS, `${SHOT}-settings.png`) })
   }
@@ -578,9 +579,8 @@ try {
           .join(' '),
       })),
     )
-    process.stdout.write(
-      `editables:\n${found.map(f => `  ${JSON.stringify(f)}`).join('\n')}\n`,
-    )
+    const editableLines = found.map(f => `  ${JSON.stringify(f)}`).join('\n')
+    process.stdout.write(`editables:\n${editableLines}\n`)
   }
 
   if (SCENARIO === 'mobile') {
