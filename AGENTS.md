@@ -21,9 +21,10 @@ naming a public mirror here leaks nothing.
   stage is the published image: that base plus a profile baked from the registry, installed by name
   and *strictly* — a release that cannot ship its own plugins is not a release, so the build fails
   while one is unpublished. `Dockerfile.dev` is built from the same `base` target, never from the
-  published image, so it does not depend on anything being published; it adds the browsers' libraries (the headless
-  shell's set, plus the three the full Chromium adds), and bakes the same profile from this checkout's `packages/` as a `link:`. A
-  deployment may mount a checkout over `/opt/dsh/packages`, but that checkout has to be **built**
+  published image, so it does not depend on anything being published; it adds the browsers'
+  libraries (the headless shell's set, plus the three the full Chromium adds), and bakes the same
+  profile from this checkout's `packages/` as a `link:`. A deployment may mount a checkout over
+  `/opt/dsh/packages`, but that checkout has to be **built**
   first (`pnpm --recursive build` turns `src/` into the `lib/` the manifests name): a linked
   package whose entry files are missing is put back to the image's copy, exactly like a broken one. A test or development convenience never goes into `Dockerfile`; the published image
   *should* fail to launch a browser.
@@ -72,9 +73,10 @@ and then `:dev` — in that order, and both orders are the point. `:base` carrie
 that looks fresh; and the compiled `lib/` is what dsh loads, so `Dockerfile.dev` refuses to build a package
 that has none — or whose `src/` is newer than its `lib/`, which is what a forgotten rebuild
 looks like — rather than shipping one that cannot load, or is stale. `prepack` runs the same
-build on publish. The dev overlay does not build anything: it selects `image:
-  deepseek-harness-dsh:dev`, refuses to pull, and resets the base service's `build`, so `pnpm dev`
-stays the only path to `:dev` and a stale `:base` cannot end up in a `:dev` that looks freshly built.
+build on publish. The dev overlay does not build anything: it selects
+`image: deepseek-harness-dsh:dev`, refuses to pull, and resets the base service's `build`, so
+`pnpm dev` stays the only path to `:dev`, and a stale `:base` cannot end up in a `:dev` that looks
+freshly built.
 `docker compose build` is the published image on its own — the one build that needs the plugins
 published.
 
@@ -140,8 +142,8 @@ Observe the running thing; do not reason from source.
 - **`lib/` is build output**, produced by `pnpm --recursive build` *before* the images
   are built — `Dockerfile.dev` ships those compiled files and refuses to build a package whose
   `lib/index.js` — or `lib/client.js`, when the package also has a browser half — is missing, or
-  older than its `src/`, so a forgotten rebuild fails the build
-  instead of shipping a `link:` target with nothing to load.
+  older than its `src/`, so a forgotten rebuild fails the build instead of shipping a `link:`
+  target with nothing to load.
 - A patch **replaces the row's whole `config`** — restate every key that should survive.
 - Patch YAML takes `#` comments only; `//` fails validation and the install rolls back.
 - `link:` dogfoods from source; `file:` copies.
