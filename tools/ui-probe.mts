@@ -326,8 +326,9 @@ if (flag('--no-browser')) {
   const html = await res.text()
   // The shell injects it as globalThis["__DSH_BOOT__"], with `<` and `&` escaped so a
   // plugin-controlled string cannot break out of the script element.
-  const boot =
-    /globalThis\["__DSH_BOOT__"\]\s*=\s*([\s\S]*?)\s*<\/script>/.exec(html)
+  const boot = /globalThis\["__DSH_BOOT__"\]\s*=\s*([\s\S]*?)<\/script>/.exec(
+    html,
+  )
   const graph = (boot?.[1] ?? '')
     .replaceAll('&amp;', '&')
     .replaceAll('&quot;', '"')
@@ -470,9 +471,7 @@ try {
           'button, a, [role="button"], [role="tab"], li, span, div',
         ),
       ]
-      const el = all
-        .reverse()
-        .find(e => (e.textContent ?? '').trim() === 'Settings')
+      const el = all.reverse().find(e => e.textContent.trim() === 'Settings')
       if (!el) {
         return false
       }
@@ -489,7 +488,7 @@ try {
         ),
       ]
         .map(e => ({
-          t: (e.textContent ?? '')
+          t: e.textContent
             .replaceAll(/\s+/g, ' ')
             .trim()
             .slice(0, TEXT_EXCERPT_CHARS),
@@ -515,7 +514,7 @@ try {
         ]
 
         all.reverse()
-        const el = all.find(e => (e.textContent ?? '').trim() === t)
+        const el = all.find(e => e.textContent.trim() === t)
         if (!el) {
           return false
         }
@@ -532,11 +531,11 @@ try {
         bg: getComputedStyle(document.body).backgroundColor,
         buttons: [...document.querySelectorAll('button')]
           .filter(b =>
-            ['Light', 'Dark', 'System'].includes((b.textContent ?? '').trim()),
+            ['Light', 'Dark', 'System'].includes(b.textContent.trim()),
           )
           .map(
             b =>
-              `${(b.textContent ?? '').trim()}:${b.getAttribute('aria-pressed') ?? b.getAttribute('aria-checked') ?? b.className.slice(0, 24)}`,
+              `${b.textContent.trim()}:${b.getAttribute('aria-pressed') ?? b.getAttribute('aria-checked') ?? b.className.slice(0, 24)}`,
           ),
       }))
 
@@ -700,7 +699,7 @@ try {
     bodyLength: document.body.innerHTML.length ?? 0,
     // Plugins under test report through body.dataset (see packages/privileged-ui).
     dataset: { ...document.body.dataset },
-    text: (document.body.textContent ?? '')
+    text: document.body.textContent
       .replaceAll(/\s+/g, ' ')
       .slice(0, REPORT_EXCERPT_CHARS),
   }))
