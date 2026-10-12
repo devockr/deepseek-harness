@@ -1,1 +1,5 @@
+# prettier reads .gitignore, so ignored paths need no entry here. The lockfile is tracked, and
+# Dockerfile.dev is only matched by prettier-plugin-sh under the exact name `Dockerfile` — the
+# dev variant would fail the check with "No parser could be inferred".
 pnpm-lock.yaml
+Dockerfile.dev
