@@ -11,7 +11,7 @@
  * the installed package working, and the caller fixes ownership afterwards.
  */
 import { cp, lstat, mkdir, rename, rm, stat, symlink, writeFile } from 'node:fs/promises'
-import { dirname, join, resolve } from 'node:path'
+import path from 'node:path'
 
 interface Manifest {
   dependencies: Record<string, string>
@@ -27,7 +27,7 @@ interface Package {
 const exists = async (path: string) => (await stat(path).catch(() => undefined)) !== undefined
 
 const packageOf = async (dir: string) =>
-  (await import(join(dir, 'package.json'), { with: { type: 'json' } }).catch(() => undefined))
+  (await import(path.join(dir, 'package.json'), { with: { type: 'json' } }).catch(() => undefined))
     ?.default as Package | undefined
 
 /**
@@ -116,12 +116,12 @@ if (!home) {
   process.exit(1)
 }
 
-const live = join(home, '.dsh/profiles/web')
-const liveManifest = join(live, 'package.json')
+const live = path.join(home, '.dsh/profiles/web')
+const liveManifest = path.join(live, 'package.json')
 const liveModule = await import(liveManifest, { with: { type: 'json' } }).catch(() => undefined)
 
 if (liveModule) {
-  const bakedManifest = (await import(join(baked, 'package.json'), { with: { type: 'json' } }))
+  const bakedManifest = (await import(path.join(baked, 'package.json'), { with: { type: 'json' } }))
     .default as Manifest
   const manifest = liveModule.default as Manifest
   const { dependencies } = manifest
@@ -130,17 +130,17 @@ if (liveModule) {
   let changed = false
 
   for (const [name, spec] of Object.entries(bakedManifest.dependencies)) {
-    const target = join(live, 'node_modules', name)
+    const target = path.join(live, 'node_modules', name)
     const present = await exists(target)
     const installedManifest = present ? await packageOf(target) : undefined
     const installed = installedManifest?.version
-    const wanted = (await packageOf(join(baked, 'node_modules', name)))?.version
+    const wanted = (await packageOf(path.join(baked, 'node_modules', name)))?.version
     // A directory dsh cannot read a manifest from is no more usable than a missing one — and the
     // version comparison alone would call it equal and leave it there.
     const absent = (
       await Promise.all(
         entriesOf(installedManifest).map(async (entry) =>
-          (await exists(resolve(target, entry))) ? undefined : entry,
+          (await exists(path.resolve(target, entry))) ? undefined : entry,
         ),
       )
     ).filter((entry) => entry !== undefined)
@@ -160,13 +160,13 @@ if (liveModule) {
       // Both sides can be pnpm links — the destination into the live profile's store, the source
       // into the image's — so a link is recreated and files are dereferenced. The scope directory
       // may not exist yet on either path.
-      await mkdir(dirname(target), { recursive: true })
+      await mkdir(path.dirname(target), { recursive: true })
       await atomicReplace(target, (staging) =>
         spec.startsWith('link:')
           ? // A link spec is written relative to the manifest that carries it, so it has to be read
             // from there — the link itself lives in the live profile's node_modules.
-            symlink(resolve(baked, spec.slice('link:'.length)), staging)
-          : cp(join(baked, 'node_modules', name), staging, { recursive: true, dereference: true }),
+            symlink(path.resolve(baked, spec.slice('link:'.length)), staging)
+          : cp(path.join(baked, 'node_modules', name), staging, { recursive: true, dereference: true }),
       )
       dependencies[name] = spec
       // Only a package that was not installed at all gets its bundle entry: one that is installed
