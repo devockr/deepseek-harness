@@ -165,12 +165,25 @@ if (dry) {
 //    a container, then keeps a dead entry it can never act on (a NAS UI showing a container that
 //    does not exist). Removing the old container first leaves the name free, so `up` creates it
 //    directly and the only name anything ever sees is the real one.
+//    Removing the old container means anything that makes `up` fail takes the deployment down
+//    with it, so what can be known first is checked first: with `pull_policy: never` a missing
+//    image is the predictable failure, and it used to fail before anything was touched. The
+//    pre-flight run above happens to prove the image exists too, but only when the deployment
+//    mounts something — a config with no mounts never reaches docker before the removal.
+if (service.image === undefined) {
+  die('the overlay names no image, so there is nothing to recreate from')
+}
+try {
+  await docker(['image', 'inspect', service.image])
+} catch {
+  die(`image ${service.image} is not in this daemon — run \`pnpm dev\` first; nothing was touched`)
+}
 console.log('deploy:dev: recreating (remove the container, then up --no-build)')
 try {
   await compose(['rm', '-sf', 'dsh'])
   await compose(['up', '-d', '--no-build'])
 } catch (error) {
-  die(`compose recreate failed:\n${stderrOf(error)}`)
+  die(`compose recreate failed after the old container was removed — the deployment is down; fix the cause and run this again:\n${stderrOf(error)}`)
 }
 
 for (let attempt = 1; attempt <= 30; attempt++) {
