@@ -26,7 +26,8 @@
   "files": [
     "lib/index.js",
     "lib/client.js",
-    "cordis.patch.yml"
+    "cordis.patch.yml",
+    "assets/apple-touch-icon.png"
   ],
   "exports": {
     ".": {
@@ -55,5 +56,6 @@
     "@deepseek-ai/dsh-api-gateway": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-connection": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-modules": "0.2.0-rc.2"
-  }
+  },
+  "icon": "./assets/apple-touch-icon.png"
 }
