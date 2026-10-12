@@ -72,7 +72,9 @@ and then `:dev` — in that order, and both orders are the point. `:base` carrie
 that looks fresh; and the compiled `lib/` is what dsh loads, so `Dockerfile.dev` refuses to build a package
 that has none — or whose `src/` is newer than its `lib/`, which is what a forgotten rebuild
 looks like — rather than shipping one that cannot load, or is stale. `prepack` runs the same
-build on publish.
+build on publish. The dev overlay does not build anything: it selects `image:
+  deepseek-harness-dsh:dev`, refuses to pull, and resets the base service's `build`, so `pnpm dev`
+stays the only path to `:dev` and a stale `:base` cannot end up in a `:dev` that looks freshly built.
 `docker compose build` is the published image on its own — the one build that needs the plugins
 published.
 
@@ -137,7 +139,8 @@ Observe the running thing; do not reason from source.
   `cordis.patch.yml`, `README.md`; npm scope `@idsh`.
 - **`lib/` is build output**, produced by `pnpm --recursive build` *before* the images
   are built — `Dockerfile.dev` ships those compiled files and refuses to build a package whose
-  `lib/index.js` is missing, or older than its `src/`, so a forgotten rebuild fails the build
+  `lib/index.js` — or `lib/client.js`, when the package also has a browser half — is missing, or
+  older than its `src/`, so a forgotten rebuild fails the build
   instead of shipping a `link:` target with nothing to load.
 - A patch **replaces the row's whole `config`** — restate every key that should survive.
 - Patch YAML takes `#` comments only; `//` fails validation and the install rolls back.
