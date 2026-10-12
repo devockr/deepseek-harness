@@ -46,8 +46,9 @@ naming a public mirror here leaks nothing.
 - **The state directory is runtime state**, bind-mounted and gitignored — not a place for scripts,
   and neither is the image. Local helpers go in `.tasks/` (also gitignored); verification helpers
   stay on the machine that runs them.
-- **Machine specifics never get committed.** The real compose file is gitignored; the templates
-  are `docker-compose.example.yml` and its dev overlay `docker-compose.dev.example.yml`.
+- **Machine specifics never get committed.** The real compose file is gitignored; what is tracked
+  is `docker-compose.example.yml` for the deployment and `docker-compose.dev.yml` for the browser
+  settings, which are a state-directory path and a public mirror and hold nothing personal.
 - **Each image has its own ignore file**: `.dockerignore` for `Dockerfile` (which copies only
   `entrypoint.sh`), `Dockerfile.dev.dockerignore` for the dev image (`packages/`, plus the
   Dockerfile itself, which BuildKit reads from the context). Neither build carries the other's
@@ -119,8 +120,8 @@ Observe the running thing; do not reason from source.
 - Browser-driven checks run in `:dev`, not in the published image. The browser binaries are in
   neither image: they live under the state directory (`PLAYWRIGHT_BROWSERS_PATH`), which is why
   a container rebuild re-uses them, and `PLAYWRIGHT_DOWNLOAD_HOST` points a real download at a
-  mirror on a slow network — `docker-compose.dev.example.yml` sets both, the second to the same
-  public npmmirror `NPM_REGISTRY` defaults to. An install that was killed leaves a `__dirlock`
+  mirror on a slow network — `docker-compose.dev.yml` sets both, the second to the same public
+  npmmirror `NPM_REGISTRY` defaults to. An install that was killed leaves a `__dirlock`
   behind and the next attempt waits on it — clear that before retrying.
 - For A/B work that must not touch a live deployment, boot a throwaway state directory with its
   own profile instead of the deployment's, and point the launcher at a different dsh build when

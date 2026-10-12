@@ -18,5 +18,3 @@ id_ed25519
 # dsh packages compile src/ into lib/, and lib/ is what ships — build output, not source.
 packages/*/lib/
 
-# 真实文件的 dev overlay（模板是 docker-compose.dev.example.yml）
-/docker-compose.dev.yml

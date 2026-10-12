@@ -1,0 +1,17 @@
+# Dev overlay: the browser settings, for running the `:dev` image.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --no-build
+#
+# It is safe to commit: a path inside the bind-mounted state directory and a public mirror. The
+# published image has no browser libraries on purpose — a release should fail to launch a browser
+# rather than carry one — so neither variable does anything there.
+services:
+  dsh:
+    environment:
+      # Where the browsers live. They are in no image, and this path is inside the state
+      # directory, so a container rebuild re-uses them instead of downloading them again.
+      - PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH:-/home/app/.dsh/cache/ms-playwright}
+      # Browser binaries come from Playwright's CDN, which is slow on some networks. This is the
+      # public npmmirror of the same builds — the host NPM_REGISTRY already defaults to in both
+      # Dockerfiles. Point it elsewhere, or drop the line, if you prefer.
+      - PLAYWRIGHT_DOWNLOAD_HOST=${PLAYWRIGHT_DOWNLOAD_HOST:-https://cdn.npmmirror.com/binaries/playwright}
