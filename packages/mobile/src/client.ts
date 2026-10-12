@@ -54,26 +54,29 @@ window.__ModuleLoader__.load({
         if (event.key !== 'Enter' || event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return
         if (event.isComposing || event.keyCode === 229) return // mid-IME
         if (!window.matchMedia('(pointer: coarse)').matches) return
-        const target = event.target
-        if (!(target instanceof Element)) return
         // Only the composer's own editor: the same rewrite on a plain input (the session
         // search) or the terminal's textarea would break them, and the patch this replaces
         // lived inside the composer's handler, so that is the scope it had.
-        const editable = target.closest('[contenteditable="true"]')
-        if (editable === null) return
+        //
+        // Two things about finding it: the composer writes `contenteditable=""` rather than
+        // `"true"` — dsh's own shortcut plugin matches both — and the editor sits inside a shadow
+        // root, where the event target is retargeted to the host. composedPath sees through it.
+        const editable = event
+          .composedPath()
+          .find(
+            (node): node is HTMLElement =>
+              node instanceof HTMLElement &&
+              (node.getAttribute('contenteditable') === 'true' || node.getAttribute('contenteditable') === ''),
+          )
+        if (editable === undefined) return
         event.stopPropagation()
         event.preventDefault()
+        // A synthetic keydown never produces the browser's own line break — untrusted events
+        // have no default behaviour — and the composer's editor is Lexical, which drives its
+        // insertLineBreak command from beforeinput. Measured on the running editor: this adds
+        // <br data-lexical-managed-linebreak> where a dispatched shift+Enter adds nothing.
         editable.dispatchEvent(
-          new KeyboardEvent('keydown', {
-            key: 'Enter',
-            code: 'Enter',
-            keyCode: 13,
-            which: 13,
-            shiftKey: true,
-            bubbles: true,
-            cancelable: true,
-            composed: true,
-          }),
+          new InputEvent('beforeinput', { inputType: 'insertLineBreak', bubbles: true, cancelable: true }),
         )
       }
       document.addEventListener('keydown', onKeydown, true)
@@ -81,12 +84,13 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * The iOS home-screen icon, from the served favicon, with the image's own rewrite:
-     * every glyph fill white, the square viewBox, 1024px, and a blue rounded square
-     * behind the glyph.
+     * The iOS home-screen icon. iOS ignores an SVG apple-touch-icon and nothing under a plugin
+     * package is reachable by URL, so the artwork comes from the favicon the app already serves
+     * and is rasterised here.
      *
-     * Not verified on a real iOS device — the claim is only that the transformed icon is
-     * offered as an apple-touch-icon, which is what the image's favicon rewrite relied on.
+     * One tile, no prefers-color-scheme variant: iOS samples the icon when the shortcut is added,
+     * so a pair would freeze whichever theme was active then, while Apple's own dark-icon
+     * treatment swaps the background by itself. Mid-tone brand blue with a light glyph survives it.
      */
     async function rewriteHomeScreenIcon(): Promise<Disposable> {
       const link = document.querySelector('link[rel~="icon"]')
@@ -96,14 +100,22 @@ window.__ModuleLoader__.load({
         .replace(/(<path[^>]*)fill="#[0-9A-Fa-f]{3,6}"/g, '$1fill="#FFFFFF"')
         .replace(/(<svg[^>]*)viewBox="[^"]*"/, '$1viewBox="-7.83 -7.83 66 66"')
         .replace(/(<svg[^>]*)width="[0-9.]+" height="[0-9.]+"/, '$1width="1024" height="1024"')
-        .replace(
-          /<path/,
-          '<rect x="-7.83" y="-7.83" width="66" height="66" rx="12" ry="12" fill="#4D6BFE"/><path',
-        )
+        .replace(/<path/, '<rect x="-7.83" y="-7.83" width="66" height="66" rx="12" ry="12" fill="#4D6BFE"/><path')
+      const image = new Image()
+      image.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
+      await image.decode()
+      // 512: the largest slot in service is iPad Pro at 167pt x2 = 334px, and iOS only ever
+      // downsamples. 180 (the iPhone slot) is soft there; 1024 measures 47KB of data URI.
+      const SIZE = 512
+      const canvas = document.createElement('canvas')
+      canvas.width = SIZE
+      canvas.height = SIZE
+      const context = canvas.getContext('2d')
+      if (context === null) return () => {}
+      context.drawImage(image, 0, 0, SIZE, SIZE)
       const icon = document.createElement('link')
       icon.rel = 'apple-touch-icon'
-      icon.dataset.idshMobile = 'icon'
-      icon.href = 'data:image/svg+xml,' + encodeURIComponent(svg)
+      icon.href = canvas.toDataURL('image/png')
       document.head.append(icon)
       return () => icon.remove()
     }
