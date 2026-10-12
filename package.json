@@ -3,11 +3,14 @@
   "private": true,
   "description": "Companion dsh plugins for the container image in this repository",
   "license": "MIT",
+  "type": "module",
   "engines": {
     "node": ">=24"
   },
   "scripts": {
     "dev": "pnpm build && docker build --target base -t deepseek-harness-dsh:base . && docker build -f Dockerfile.dev -t deepseek-harness-dsh:dev .",
+    "deploy:dev": "pnpm dev && node tools/deploy-dev.ts",
+    "deploy:dev:dry": "node tools/deploy-dev.ts --dry",
     "build": "pnpm --recursive --if-present --workspace-concurrency=1 run build",
     "pack": "pnpm --recursive pack",
     "publish": "pnpm --recursive publish --access public"
