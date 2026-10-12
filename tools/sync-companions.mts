@@ -24,15 +24,21 @@ interface Package {
   exports?: Record<string, unknown>
 }
 
-const exists = async (path: string) =>
-  (await fs.stat(path).catch(() => {})) !== undefined
+const exists = async (path: string): Promise<boolean> => {
+  const stat = await fs.stat(path).catch(() => null)
+
+  return stat !== null
+}
+
+const importJson = async (file: string): Promise<unknown> =>
+  import(file, { with: { type: 'json' } }).catch(() => null)
 
 const packageOf = async (dir: string): Promise<Package | undefined> => {
-  const loaded = await import(path.join(dir, 'package.json'), {
-    with: { type: 'json' },
-  }).catch(() => undefined)
+  const loaded = (await importJson(path.join(dir, 'package.json'))) as {
+    default?: Package
+  } | null
 
-  return loaded?.default as Package | undefined
+  return loaded?.default
 }
 
 /**
@@ -100,7 +106,7 @@ const atomicReplace = async (
   // dropped once the swap succeeded — and put back if it did not, so the installed thing is never
   // left absent for the next boot to trip over. `lstat`, because a dangling link is an entry that
   // has to be moved out of the way: renaming a directory onto it fails instead.
-  const had = (await fs.lstat(target).catch(() => {})) !== undefined
+  const had = (await fs.lstat(target).catch(() => null)) !== null
   await fs.rm(parked, { recursive: true, force: true })
   if (had) {
     await fs.rename(target, parked)
@@ -109,7 +115,7 @@ const atomicReplace = async (
     await fs.rename(staging, target)
   } catch (error) {
     if (had) {
-      await fs.rename(parked, target).catch(() => {})
+      await fs.rename(parked, target).catch(() => null)
     }
     await fs.rm(staging, { recursive: true, force: true })
     throw error
@@ -127,14 +133,14 @@ if (!home) {
 
 const live = path.join(home, '.dsh/profiles/web')
 const liveManifest = path.join(live, 'package.json')
-const liveModule = await import(liveManifest, { with: { type: 'json' } }).catch(
-  () => {},
-)
+const liveModule = (await importJson(liveManifest)) as {
+  default: Manifest
+} | null
 
 if (liveModule) {
-  const bakedModule = await import(path.join(baked, 'package.json'), {
-    with: { type: 'json' },
-  })
+  const bakedModule = (await importJson(path.join(baked, 'package.json'))) as {
+    default: Manifest
+  }
 
   const bakedManifest = bakedModule.default as Manifest
   const manifest = liveModule.default as Manifest
