@@ -53,7 +53,7 @@ ARG NPM_REGISTRY=https://registry.npmmirror.com/
 # pnpm is in the same install because the plugin manager drives it and has no npm
 # fallback, and because it must resolve from the image's PATH: the in-app installer
 # spawns it with a scrubbed environment, so a user-prefix install is invisible.
-RUN --mount=type=cache,id=npm_cache,target=/root/.npm npm install -g --registry="$NPM_REGISTRY" @deepseek-ai/dsh@0.2.0-rc.2 pnpm@12.10.1
+RUN --mount=type=cache,id=npm_cache,target=/root/.npm npm install -g --registry="$NPM_REGISTRY" @deepseek-ai/dsh@0.2.0-rc.2 pnpm@12.11.2
 
 # This image used to patch dsh's installed JavaScript here: the loopback gate the
 # settings page hides behind, the touch CSS, the home-screen icon, and the composer's
