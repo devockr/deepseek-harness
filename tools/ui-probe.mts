@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import type {} from 'typed-query-selector'
 /**
  * Boot a throwaway `dsh web` instance and drive it with a real browser.
  *
@@ -39,7 +38,7 @@ const values = (name: string): string[] => {
     if (argv[index] !== name) {
       continue
     }
-    const value = argv[index + 1]
+    const value: string | undefined = argv[index + 1]
     if (value === undefined || value.startsWith('-')) {
       throw new Error(`${name} needs a value`)
     }
@@ -72,7 +71,12 @@ const PARAM_EXCERPT_CHARS = 70
 const REPORT_EXCERPT_CHARS = 300
 const LOG_TAIL_LINES = 25
 const OUTPUT_TAIL_CHARS = 400
-const MATCH_WINDOW_CHARS = -25
+// A throwaway state directory under the system temp is the point: it is ours to delete, and
+
+// PROBE_HOME overrides it for a caller who wants to keep one.
+
+// eslint-disable-next-line sonarjs/publicly-writable-directories
+
 const HOME = process.env.PROBE_HOME ?? '/tmp/dsh-ui-probe'
 // Whether this run owns HOME. A caller-supplied PROBE_HOME can hold their own profile, so it is
 // never removed; the default directory is ours, and a run that was kept or killed must not turn
@@ -513,7 +517,9 @@ try {
           ...document.querySelectorAll(
             'button, a, [role="button"], [role="tab"], li, span, div',
           ),
-        ].toReversed()
+        ]
+
+        all.reverse()
         const el = all.find(e => (e.textContent ?? '').trim() === t)
         if (!el) {
           return false
@@ -699,7 +705,7 @@ try {
     bodyLength: document.body?.innerHTML.length ?? 0,
     // Plugins under test report through body.dataset (see packages/privileged-ui).
     dataset: { ...document.body?.dataset },
-    text: (document.body?.innerText ?? '')
+    text: (document.body?.textContent ?? '')
       .replaceAll(/\s+/g, ' ')
       .slice(0, REPORT_EXCERPT_CHARS),
   }))
