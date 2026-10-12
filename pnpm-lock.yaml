@@ -9,8 +9,8 @@ importers:
   .:
     devDependencies:
       '@1stg/eslint-config':
-        specifier: ^10.3.1
-        version: 10.3.1(@typescript-eslint/utils@8.71.1(@typescript/typescript6@6.0.2)(eslint@10.12.0(supports-color@9.4.0))(supports-color@9.4.0))(@typescript/typescript6@6.0.2)(eslint@10.12.0(supports-color@9.4.0))(prettier@3.9.10)(supports-color@9.4.0)
+        specifier: ^10.3.2
+        version: 10.3.2(@typescript-eslint/utils@8.71.1(@typescript/typescript6@6.0.2)(eslint@10.12.0(supports-color@9.4.0))(supports-color@9.4.0))(@typescript/typescript6@6.0.2)(eslint@10.12.0(supports-color@9.4.0))(prettier@3.9.10)(supports-color@9.4.0)
       '@1stg/prettier-config':
         specifier: ^5.4.0
         version: 5.4.0(@typescript/typescript6@6.0.2)(prettier@3.9.10)(supports-color@9.4.0)
@@ -73,8 +73,8 @@ packages:
   '@1stg/config@1.2.1':
     resolution: {integrity: sha512-/b/rm0KEX+NhE+k8vtlw3xx+pwPzPuqMIzZomP5k2SAZRebdPODJzuQjWYCuweSsab3vH4/Run6LmPocEOCDnQ==}
 
-  '@1stg/eslint-config@10.3.1':
-    resolution: {integrity: sha512-lvQHVFegWSmuVNRhI6k9lhQnXlIV7AGwdw2On7CDkr/ijsIFWjo4WtZPEFq32Ws1BE8YsdlCJ97V+Hrn9mMAig==}
+  '@1stg/eslint-config@10.3.2':
+    resolution: {integrity: sha512-wkKWWrvgRJTKMSpPx4bEF03wtrjXr1X4cMARDnXmW+0NulX+nBSLAVAKW2H4+lOf9G4B+FASgzORwHKhPFYepA==}
     engines: {node: ^18.20.0 || ^20.19.0 || >=22.12.0}
     peerDependencies:
       '@babel/eslint-parser': ^7.0.0
@@ -2564,7 +2564,7 @@ snapshots:
 
   '@1stg/config@1.2.1': {}
 
-  '@1stg/eslint-config@10.3.1(@typescript-eslint/utils@8.71.1(@typescript/typescript6@6.0.2)(eslint@10.12.0(supports-color@9.4.0))(supports-color@9.4.0))(@typescript/typescript6@6.0.2)(eslint@10.12.0(supports-color@9.4.0))(prettier@3.9.10)(supports-color@9.4.0)':
+  '@1stg/eslint-config@10.3.2(@typescript-eslint/utils@8.71.1(@typescript/typescript6@6.0.2)(eslint@10.12.0(supports-color@9.4.0))(supports-color@9.4.0))(@typescript/typescript6@6.0.2)(eslint@10.12.0(supports-color@9.4.0))(prettier@3.9.10)(supports-color@9.4.0)':
     dependencies:
       '@1stg/config': 1.2.1
       '@eslint-community/eslint-plugin-eslint-comments': 4.8.1(eslint@10.12.0(supports-color@9.4.0))

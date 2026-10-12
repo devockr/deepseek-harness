@@ -4,3 +4,5 @@ packages:
   - packages/*
 allowBuilds:
   unrs-resolver: set this to true or false
+minimumReleaseAgeExclude:
+  - '@1stg/eslint-config@10.3.2'
