@@ -15,12 +15,15 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "pack": "pnpm --recursive pack",
-    "publish": "pnpm --recursive publish --access public"
+    "publish": "pnpm --recursive publish --access public",
+    "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {
     "@1stg/prettier-config": "^5.4.0",
+    "@types/node": "^26.6.5",
+    "@typescript/native": "npm:typescript@^7.0.2",
     "playwright": "^1.64.0",
     "prettier": "^3.9.10",
-    "typescript": "^7.0.2"
+    "typescript": "npm:@typescript/typescript6@^6"
   }
 }
