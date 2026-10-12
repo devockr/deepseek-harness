@@ -106,10 +106,56 @@ window.__ModuleLoader__.load({
      * The iOS home-screen icon, from assets/apple-touch-icon.png. iOS ignores an SVG
      * apple-touch-icon — which is why the phone kept its own default — and nothing under a
      * plugin package is reachable by URL: the client half arrives through a bundle endpoint and
-     * every /plugins/… path answers 404 (measured, with a 200 control). So the PNG is inlined by
-     * tools/inline-icon.mts after tsc, inside the one file the browser does get.
+     * every /plugins/… path answers 404 (measured, with a 200 control). So the PNG is inlined here, once, from
+     * assets/apple-touch-icon.png — the one file the browser does get has to carry it.
      */
-    const HOME_SCREEN_ICON = 'data:image/png;base64,__IDSH_ICON_PNG__'
+    const HOME_SCREEN_ICON =
+      'data:image/png;base64,' +
+      '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' +
+      '7lzkqcWmJ0NTT2tDliyi4So10KhJ3DeXd0FDaWoDTKNMqqRQ3LMqsH3UdXRGRRUSJzdgI6cZUpdSU5rHCRCIxjK1koSvy11Y' +
+      'ZqJcvLJKNRA5UL64xPRpyiFZP27cjGHcj7uQmE6n0KFyTW+mzOTY4zpaL7XOiwoY8xVdzeo+yGX2qyZ0f3bDjbemVO1i6H1S' +
+      'fs5nX44aVtDu66LeY11pC6VOyqHGJ3FyuI8xab1g0xfa/3tr1KATkXC9QaU8TjjnJs/HKiRFDk44c38pZAjSn5NMCi6isX5U' +
+      'H95G6I6EwIbqyc4tM5IVGLtr43ib6T8trl/04IUUGVIBynJEGRzNRBE/tEOzeK1p0CM1Dh738P8zOYjkiTl5GSODuiyWIfmF' +
+      'JAfa4Hz6YkFHDSdkmaydeSEHR8V4ihgGZ3F+IvqP899lT440++VzRw7cjotXcyqcHDnTJCdBLa6AI9Uue9Tb7gZ7smr989z1' +
+      'EpW2j55lGp0cE+aZ3Hrs7Ghnv82GHBzbk39mJE4OdhZP6R6Jxayc9n8+ZdI/NYxImPuKHA4ISTzfV7UILzWs2GIUpGRGDlYF' +
+      'z18nPyZCm2w2lyZz+nx6zEBfMrRF58r2ws593m+NwYwhjgcv3ObCkLSiMCMlclBb6vIRN6K3y+otLHszjc0FZXyBmJHe7HM/' +
+      'neYEeJzGMjCjs0uPnEqWGZeu2j+NNSJHDTCqxc/STcEl4snew8Y58xrCKeaTO9iWytzo2QVjRqpHarjLf3qrNYeF1ekjFq8U' +
+      '1S5ctqg3gkbIyZ0ixRFuhWNG2ofxfH/R79T3e0N1FSPj7rcOEakG8nM37yreqSglOcZr/Dy/P02UlSGGNdT8allF/HdvkzZl' +
+      '6L2NdUT6XSONyBGbZ9qjkgq6LzBXo56ryzltQ5r9jphiAlEsRnx+X0tRmZEBOTippNX3aC8GbwTyLrm4y+GdeDPj/GkTqYr1' +
+      'dEHaCCePxj6MpOTkqCSd/J+/SttZoJE37isTSwhbj586ML5tlKPUCc1yOKmnGCdSB2oRIw70P9WDlabzlo9Rw5PCT8u00WYD' +
+      'iRzeCDochyGCPkOYlW95f6mUgmuOGo5L88GQyaXrzbBxIkfYpKSfmkufuOOKnbLA1wgXP9l6thhGfw5qiqGqbOuPf0GnTj3F' +
+      '55nFIofpPRwnxHC+6uHR/UBiw38hjWGjnrMx2F8iJsegNa0MMU5SLD85AL5hiOFJhBLM6aJ5tVqfTMDi3qZbU+fsOXR77ooY' +
+      'GhpIz7OZJnqGdKnIUeEH/kQ4o31+/xfOG2fUE64G8+fDDfRhG8K9cJfCk0mLZVY/9/Jc/ESOPvvLtj3Z9wp81Wrpt3Zp4kV7' +
+      'ENeBoGkOKSk2OXpCgzycjkCujDM9aOWtmQ6hQuQ/yetiHAUhcgTDjCUJ1s1DxBqsJYQbsAG6gE27HAXo3kMxnAWT6MjNcpJj' +
+      '4O2J5lRlc26scBt3OiPST4aq0h0943GgtcjhFotSfM/tATz4vLgmvXOyJHDf/djZKVxWlGtt9shpy9x0Ro4OalK0ErG+PzeR' +
+      'cdXRC63uXSc4JfwHXBaim2mLnLYuemILWpsdkOcPxxKCfqyrKx8uSJdz7FJWEnmRo666E5ewO9OhGgz0yaqzRuTwVeinxTR9' +
+      'RwRNyaxXMjgqXOQwIYbOElJea0uDFnTCuefERI48AlUmXxv5ho7O+DnB0DCSEI/MaFxOFJscvfXAiJZJOaDfidLSCCFIdtH3' +
+      'RtdMIy8VpSJHv5Zo/BL8A1Qa5DH5sk+cdQaeVo5Dr4BAlGQD9TnEgq9sNC+87gTMOZ/aJnIIIocgcggihyByCCKHIIgcgsgh' +
+      'iByCyCGIHILIIYgcgsghiByCyCEIIocgcggihyByCCKHIHIIIocgcggihyByCCKHXoEgcggihyByCCKHIHIIIocgcggihyBy' +
+      'CCKHIIgcgsghiByCyCGIHILIIYgcQsHxf82dy3vgrHPWAAAAAElFTkSuQmCC'
 
     function apply(ctx: PluginContext): void {
       const teardown: Disposable[] = [injectCss(), rewriteEnterOnCoarsePointers()]
