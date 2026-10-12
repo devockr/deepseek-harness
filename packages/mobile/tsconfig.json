@@ -11,8 +11,7 @@
     "declaration": false,
     "sourceMap": false,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "types": ["typed-query-selector"]
+    "forceConsistentCasingInFileNames": true
   },
   "include": ["src"]
 }

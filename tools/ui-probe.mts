@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+
+import type {} from 'typed-query-selector'
 /**
  * Boot a throwaway `dsh web` instance and drive it with a real browser.
  *
@@ -455,7 +457,9 @@ try {
       if (!el) {
         return false
       }
-      el.click()
+      if (el instanceof HTMLElement) {
+        el.click()
+      }
       return true
     })
     await page.waitForTimeout(2500)
@@ -491,7 +495,9 @@ try {
         if (!el) {
           return false
         }
-        el.click()
+        if (el instanceof HTMLElement) {
+          el.click()
+        }
         return true
       }, text)
     const themeState = () =>
