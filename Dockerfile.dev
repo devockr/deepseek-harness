@@ -54,8 +54,8 @@ ARG APT_MIRROR=mirrors.aliyun.com
 # part of the layer, so the usual `rm -rf /var/lib/apt/lists/*` is not just unnecessary here — it
 # would empty the cache on every build.
 RUN --mount=type=cache,id=apt_cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,id=apt_lists,target=/var/lib/apt/lists,sharing=locked \
-    for f in /etc/apt/sources.list /etc/apt/sources.list.d/debian.sources; do \
+  --mount=type=cache,id=apt_lists,target=/var/lib/apt/lists,sharing=locked \
+  for f in /etc/apt/sources.list /etc/apt/sources.list.d/debian.sources; do \
       if [ -f "$f" ]; then sed -i "s|deb.debian.org|${APT_MIRROR}|g; s|security.debian.org|${APT_MIRROR}|g" "$f"; fi; \
     done \
  && apt-get update && apt-get install -y --no-install-recommends \
@@ -91,4 +91,3 @@ RUN mkdir -p /opt/dsh/home \
       dsh plugin --profile web add "link:${d%/}"; \
     done \
  && test -f /opt/dsh/home/.dsh/profiles/web/package.json
-
