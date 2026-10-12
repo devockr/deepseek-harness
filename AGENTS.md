@@ -51,8 +51,8 @@ naming a public mirror here leaks nothing.
 - **Machine specifics never get committed.** The real compose file is gitignored; what is tracked
   is `docker-compose.example.yml` for the deployment and `docker-compose.dev.yml` for the browser
   settings, which are a state-directory path and a public mirror and hold nothing personal.
-- **Each image has its own ignore file**: `.dockerignore` for `Dockerfile` (which copies only
-  `entrypoint.sh`), `Dockerfile.dev.dockerignore` for the dev image (`packages/`, plus the
+- **Each image has its own ignore file**: `.dockerignore` for `Dockerfile` (which copies
+  `entrypoint.sh` and `tools/`), `Dockerfile.dev.dockerignore` for the dev image (`packages/`, plus the
   Dockerfile itself, which BuildKit reads from the context). Neither build carries the other's
   content, and a new `COPY` has to be whitelisted in the right one or the build fails loudly.
 - **The `@deepseek-ai/dsh@…`/`pnpm@…` pins and the plugins baked into the images** are read by the

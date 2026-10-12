@@ -26,7 +26,6 @@ const die = (message: string): never => {
   process.exit(1)
 }
 
-
 const run = async (cmd: string, args: string[], extraEnv: Record<string, string> = {}): Promise<string> => {
   const { stdout } = await execFileAsync(cmd, args, { cwd: repo, encoding: 'utf8', env: { ...process.env, ...extraEnv } })
   return stdout
@@ -106,43 +105,48 @@ console.log(`deploy:dev: image ${image}`)
 // 2) Pre-flight: create a throwaway container with exactly the mounts the config declares. A bind
 //    source that does not resolve fails here, where nothing is at stake — `compose up` would fail
 //    the same way *after* removing the old container, which is what makes this worth doing.
-// Bind mounts only: a named volume cannot fail to resolve, and its key here is the top-level
-// short name rather than the project-scoped volume, so checking it would create a stray volume.
-// Of those, only the ones compose will not create itself: a short-syntax bind resolves with
-// `bind.create_host_path: true` and `compose up` makes the directory when it is missing, so
-// checking it here would refuse a deployment compose would complete. The rest are the failure
-// this pre-flight exists for — `compose up` would hit them after removing the old container.
+// Bind mounts only, and only those compose will not create itself: a named volume cannot fail to
+// resolve, and checking one would create a stray volume; a bind compose creates cannot fail either.
 const mounts = (service.volumes ?? []).filter(
   (mount) => mount.type === 'bind' && mount.source && mount.target && (mount.source ?? '').startsWith('/'),
 )
-// -v, not --mount: a leading slash means a path rather than a named volume, so the confusion that
-// bit the volume round cannot happen — and `--mount` parses its value as CSV, so a path with a
-// comma in it is a parse error there (measured on this daemon: -v mounts it, --mount refuses).
+// Only an explicit `create_host_path: false` means compose will refuse a missing source. The
+// default is true, and compose either writes it out or leaves it to the default depending on its
+// version — the 2.20.1 here writes `true`, Compose 5.5.0 omits it — so neither a missing field
+// nor `true` may be read as "compose will create it".
+const created = mounts.filter((mount) => mount.bind?.create_host_path !== false)
+const strict = mounts.filter((mount) => mount.bind?.create_host_path === false)
+// --mount, not -v: -v creates a missing host path on a standard engine, so the check would pass
+// for the very mount it exists to catch, and would leave a root-owned directory behind even on
+// --dry. Docker parses the value as CSV, so a field needing quoting goes to the warning pass
+// instead: this daemon refuses a quoted field outright (measured), a standard engine accepts it.
+const needsQuoting = (mount: Mount): boolean => /[",]/.test(`${mount.source}${mount.target}`)
 const toArgs = (list: Mount[]): string[] =>
-  list.flatMap((mount) => ['-v', `${mount.source}:${mount.target}${mount.read_only ? ':ro' : ''}`])
-// A short-syntax bind resolves with `bind.create_host_path: true`, and `compose up` makes the
-// directory when it is missing, so refusing those would block a deployment compose would finish.
-const created = mounts.filter((mount) => mount.bind?.create_host_path === true)
-const strict = mounts.filter((mount) => mount.bind?.create_host_path !== true)
+  list.flatMap((mount) => [
+    '--mount',
+    `type=bind,source=${mount.source as string},target=${mount.target as string}${mount.read_only ? ',readonly' : ''}`,
+  ])
+const gated = strict.filter((mount) => !needsQuoting(mount))
+const warned = [...created, ...strict.filter(needsQuoting)]
 
-if (strict.length === 0) {
+if (gated.length === 0) {
   console.log('deploy:dev: no bind needs pre-flighting')
 } else {
   try {
-    await docker(['run', '--rm', ...toArgs(strict), '--entrypoint', 'true', image])
+    await docker(['run', '--rm', ...toArgs(gated), '--entrypoint', 'true', image])
   } catch (error) {
     die(`bind pre-flight failed, nothing was touched:\n${stderrOf(error)}`)
   }
   console.log('deploy:dev: bind pre-flight passed')
 }
-// The created ones are not a gate, but they are still worth seeing: the outage this pre-flight was
-// written for was exactly a bind whose source compose would have created and the daemon refused.
-if (created.length > 0) {
+// Not a gate, but worth seeing: the outage this pre-flight was written for was a bind whose source
+// was missing and which the daemon then refused.
+if (warned.length > 0) {
   try {
-    await docker(['run', '--rm', ...toArgs(created), '--entrypoint', 'true', image])
+    await docker(['run', '--rm', ...toArgs(warned), '--entrypoint', 'true', image])
   } catch (error) {
     console.log(
-      `deploy:dev: warning — compose would create ${created.length} bind source(s) the daemon refuses:\n${stderrOf(error)}`,
+      `deploy:dev: warning — ${warned.length} bind(s) compose may create do not mount here:\n${stderrOf(error)}`,
     )
   }
 }
