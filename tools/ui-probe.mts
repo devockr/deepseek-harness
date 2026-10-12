@@ -41,7 +41,7 @@ const values = (name: string): string[] => {
     const value: string | undefined = argv[index + 1]
     // The guard is deliberate: argv can be shorter than the flag suggests, which the type of an
     // index read does not admit. Hence the comparison the linter calls impossible.
-    // eslint-disable-next-line sonarjs/different-types-comparison
+    // eslint-disable-next-line sonarjs/different-types-comparison, @typescript-eslint/no-unnecessary-condition
     if (value === undefined || value.startsWith('-')) {
       throw new Error(`${name} needs a value`)
     }
@@ -196,7 +196,7 @@ async function prepareProfile() {
     ])
     if (created.status !== 0) {
       throw new Error(
-        `could not create the probe profile:\n${created.stdout ?? ''}${created.stderr ?? ''}`,
+        `could not create the probe profile:\n${created.stdout}${created.stderr}`,
       )
     }
   }
@@ -208,9 +208,7 @@ async function prepareProfile() {
     if (r.status !== 0) {
       // Booting anyway would probe a profile without the plugin the caller asked for, and still
       // exit 0 — fail here, where the message means something.
-      throw new Error(
-        `could not install ${spec}:\n${r.stdout ?? ''}${r.stderr ?? ''}`,
-      )
+      throw new Error(`could not install ${spec}:\n${r.stdout}${r.stderr}`)
     }
   }
 }
@@ -313,11 +311,8 @@ if (flag('--no-browser')) {
   // needs that cookie. fetch follows redirects but keeps no cookie jar, so a plain
   // fetch(url) lands on the 401 page. Exchange it explicitly instead.
   const exchange = await fetch(url, { redirect: 'manual' })
-  const cookie = (
-    exchange.headers.getSetCookie?.() ?? [
-      exchange.headers.get('set-cookie') ?? '',
-    ]
-  )
+  const cookie = exchange.headers
+    .getSetCookie()
     .map(c => c.split(';')[0])
     .filter(Boolean)
     .join('; ')
@@ -702,10 +697,10 @@ try {
 
   const facts = await page.evaluate(() => ({
     title: document.title,
-    bodyLength: document.body?.innerHTML.length ?? 0,
+    bodyLength: document.body.innerHTML.length ?? 0,
     // Plugins under test report through body.dataset (see packages/privileged-ui).
-    dataset: { ...document.body?.dataset },
-    text: (document.body?.textContent ?? '')
+    dataset: { ...document.body.dataset },
+    text: (document.body.textContent ?? '')
       .replaceAll(/\s+/g, ' ')
       .slice(0, REPORT_EXCERPT_CHARS),
   }))

@@ -38,12 +38,14 @@ const run = async (
   return stdout
 }
 
-const stderrOf = (error: unknown): string =>
-  (
-    (error as { stderr?: string }).stderr ??
-    (error as Error).message ??
-    String(error)
-  ).trim()
+const stderrOf = (error: unknown): string => {
+  const stderr = (error as { stderr?: unknown }).stderr
+  if (typeof stderr === 'string') {
+    return stderr.trim()
+  }
+  const message = (error as { message?: unknown }).message
+  return typeof message === 'string' ? message.trim() : String(error).trim()
+}
 
 // docker is not on every PATH this runs under — a login shell here has node and pnpm but not
 // /usr/local/bin — so resolve it: $DOCKER, then PATH, then the usual places.

@@ -76,11 +76,7 @@ globalThis.__ModuleLoader__.load({
       // reader that has not cached the value itself — and the marker below still reports that the
       // gateway had it wrong, so the regression is visible rather than quietly papered over.
       let repaired = false
-      if (
-        connection.isLoopback === true &&
-        host === false &&
-        facts !== undefined
-      ) {
+      if (host === false && facts !== undefined) {
         try {
           facts.isLoopback = true
           repaired = true
