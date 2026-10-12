@@ -44,11 +44,16 @@ FROM ${BASE}
 # An ARG before FROM is only usable in the FROM line, so the registry has to be declared again.
 ARG NPM_REGISTRY=https://registry.npmmirror.com/
 
-# The libraries the headless shell needs, plus a font and fontconfig's own configuration:
-# without them Skia aborts the renderer the first time a page shapes text, which is every page.
+# What the browsers need: the headless shell's own set — a font is not there for its own sake,
+# since without one Skia aborts the renderer the first time a page shapes text, which is every page,
+# so fonts-liberation and fontconfig's configuration come along — plus the three libraries that the
+# full Chromium adds on top of it. `ldd <cache>/chromium-*/chrome-linux64/chrome` is the check; the
+# three pull in their own dependencies (harfbuzz, fribidi, thai, pixman, xcb-render/shm, avahi).
+# Headed runs would need the X/GTK set and an X server as well; nothing here installs one.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       libatk-bridge2.0-0 libgbm1 libxrandr2 libxcomposite1 libxdamage1 libxfixes3 \
       libxkbcommon0 libnss3 libasound2 fonts-liberation fontconfig \
+      libcups2 libcairo2 libpango-1.0-0 \
  && rm -rf /var/lib/apt/lists/*
 
 

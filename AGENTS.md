@@ -19,8 +19,8 @@ tracked `.gitignore` already ignores `.tasks/`.
   stage is the published image: that base plus a profile baked from the registry, installed by name
   and *strictly* — a release that cannot ship its own plugins is not a release, so the build fails
   while one is unpublished. `Dockerfile.dev` is built from the same `base` target, never from the
-  published image, so it does not depend on anything being published; it adds the headless shell's
-  libraries, and bakes the same profile from this checkout's `packages/` as a `link:`. A
+  published image, so it does not depend on anything being published; it adds the browsers' libraries (the headless
+  shell's set, plus the three the full Chromium adds), and bakes the same profile from this checkout's `packages/` as a `link:`. A
   deployment may mount a checkout over `/opt/dsh/packages`, but that checkout has to be **built**
   first (`pnpm --recursive build` turns `src/` into the `lib/` the manifests name): a linked
   package whose entry files are missing is put back to the image's copy, exactly like a broken one. A test or development convenience never goes into `Dockerfile`; the published image
