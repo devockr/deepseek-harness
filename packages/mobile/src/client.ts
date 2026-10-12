@@ -71,17 +71,12 @@ window.__ModuleLoader__.load({
         if (editable === undefined) return
         event.stopPropagation()
         event.preventDefault()
+        // A synthetic keydown never produces the browser's own line break — untrusted events
+        // have no default behaviour — and the composer's editor is Lexical, which drives its
+        // insertLineBreak command from beforeinput. Measured on the running editor: this adds
+        // <br data-lexical-managed-linebreak> where a dispatched shift+Enter adds nothing.
         editable.dispatchEvent(
-          new KeyboardEvent('keydown', {
-            key: 'Enter',
-            code: 'Enter',
-            keyCode: 13,
-            which: 13,
-            shiftKey: true,
-            bubbles: true,
-            cancelable: true,
-            composed: true,
-          }),
+          new InputEvent('beforeinput', { inputType: 'insertLineBreak', bubbles: true, cancelable: true }),
         )
       }
       document.addEventListener('keydown', onKeydown, true)
