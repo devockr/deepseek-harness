@@ -43,7 +43,7 @@ Reload the page. With DevTools open, `document.body.dataset.idshMobile` reads
 
 ## Verified
 
-`node tools/ui-probe.mjs --scenario mobile --install file:packages/mobile` in a phone
+`node tools/ui-probe.mts --scenario mobile --install file:packages/mobile` in a phone
 context (`hasTouch`, 390×844, DPR 3) against an **unpatched** dsh:
 
 ```

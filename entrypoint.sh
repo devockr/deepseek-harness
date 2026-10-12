@@ -166,7 +166,7 @@ elif [ -d "$profile" ] && [ ! -f "$profile/package.json" ]; then
 elif [ -d /opt/dsh/home/.dsh/profiles/web/node_modules ]; then
   # Ownership is fixed whatever the script did: it replaces packages one at a time as root, so a
   # failure halfway through would otherwise leave the ones already swapped in root-owned.
-  node /opt/dsh/tools/sync-companions.ts ||
+  node /opt/dsh/tools/sync-companions.mts ||
     echo "entrypoint: could not repair the companion packages" >&2
   chown -R "$PUID:$PGID" "$HOME/.dsh/profiles/web" ||
     echo "entrypoint: could not fix the profile ownership" >&2

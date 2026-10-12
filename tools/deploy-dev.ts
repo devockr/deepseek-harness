@@ -5,16 +5,19 @@
 //
 // `docker compose up -d` removes the old container before creating the new one, so anything that
 // would make the create fail is worth catching first.
-import { execFile } from 'node:child_process'
-import { constants } from 'node:fs'
-import { access } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
-import { setTimeout as sleep } from 'node:timers/promises'
-import { fileURLToPath } from 'node:url'
-import { promisify } from 'node:util'
+//
+// This one runs from a checkout on the host, where the root package.json makes `.ts` ESM. Tools
+// the image ships and runs itself keep the `.mts` extension: /opt/dsh/tools has no package.json,
+// so a `.ts` there would be CommonJS.
+import childProcess from 'node:child_process'
+import fs from 'node:fs'
+import path from 'node:path'
+import timers from 'node:timers/promises'
+import url from 'node:url'
+import util from 'node:util'
 
-const execFileAsync = promisify(execFile)
-const repo = dirname(dirname(fileURLToPath(import.meta.url)))
+const execFileAsync = util.promisify(childProcess.execFile)
+const repo = path.dirname(path.dirname(url.fileURLToPath(import.meta.url)))
 const dry = process.argv.includes('--dry')
 
 const die = (message: string): never => {
@@ -50,7 +53,7 @@ const docker = async (args: string[], extraEnv?: Record<string, string>): Promis
     if (!dockerBin) {
       for (const candidate of candidates) {
         try {
-          await access(candidate, constants.X_OK)
+          await fs.promises.access(candidate, fs.constants.X_OK)
           dockerBin = candidate
           break
         } catch {
@@ -70,7 +73,7 @@ if (!process.env.DEEPSEEK_API_KEY) die('DEEPSEEK_API_KEY is empty — it lives i
 const files = ['docker-compose.yml', 'docker-compose.dev.yml']
 for (const file of files) {
   try {
-    await access(join(repo, file))
+    await fs.promises.access(path.join(repo, file))
   } catch {
     die(`${file} is missing next to tools/`)
   }
@@ -130,7 +133,7 @@ for (let attempt = 1; attempt <= 30; attempt++) {
     console.log(`deploy:dev: up — ${(await docker(['inspect', 'dsh', '--format', '{{.Config.Image}}'])).trim()}`)
     process.exit(0)
   }
-  await sleep(4000)
+  await timers.setTimeout(4000)
 }
 
 die('the new container did not report "dsh web:" within two minutes — check `docker logs dsh`')
