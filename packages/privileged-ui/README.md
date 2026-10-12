@@ -39,9 +39,11 @@ rely on. It is not a substitute for authentication.
   `ctx.connection.isLoopback` is a writable boolean, sets it to `true`, and reports
   the result — including what the gateway's `$host` facts already captured — as
   `document.body.dataset.idshPrivileged` and one console line. If the property is
-  missing, not writable, or the assignment never becomes visible to the gateway
-  (`$host.isLoopback` still `false`), it reports `SELF-CHECK-FAILED …` instead of
-  failing silently. On disposal it restores the original value.
+  missing or not writable it reports `SELF-CHECK-FAILED …` instead of failing
+  silently. If the flip works but a live gateway had already copied `false` into its
+  `$host` facts, those facts are written back to `true` and the marker still reports
+  `SELF-CHECK-FAILED … host:false` — the repair is best effort, the report is not. On
+  disposal it restores the original value, and the original facts when it wrote them.
 * Host half: empty. The decision belongs to the browser, because that is where dsh
   makes it.
 
@@ -60,9 +62,11 @@ dsh plugin --profile web add @idsh/privileged-ui
 Then reload the page. Open DevTools and look for
 `document.body.dataset.idshPrivileged` — it should read
 `connection:false->true host:true` on a remote page. `host:false` means the gateway
-captured the flag before this package activated, so the rows that read `$host`
-(`ui-settings`, and the Cordis runner) never see the change — and the marker reports
-`SELF-CHECK-FAILED` for it, as loudly as a property that cannot be written.
+captured the flag before this package activated: the facts are written back to `true`
+so the rows that read `$host` (`ui-settings`, and the Cordis runner) still see the
+change, and the marker reports `SELF-CHECK-FAILED` for it anyway, as loudly as a
+property that cannot be written. A row that copied the value into its own state before
+this package activated is beyond that repair, and the marker is what tells you so.
 
 ## Limits
 
@@ -71,7 +75,8 @@ captured the flag before this package activated, so the rows that read `$host`
   silent no-op, but a dsh upgrade can still invalidate the approach.
 * Persistence mode is chosen when the consuming plugin activates. If that happens
   before this package, the flag is flipped too late: a live gateway then reports
-  `host:false` and the marker is `SELF-CHECK-FAILED`, so the regression shows up as
-  a failed self-check rather than a settings page that silently keeps changes in
-  memory only. A profile with no gateway at all reports `host:undefined` and is not
-  judged.
+  `host:false`, the facts are written back to `true` on a best-effort basis — undone
+  on disposal, so a dropped package does not leave the pages privileged — and the
+  marker is `SELF-CHECK-FAILED`. A consumer that copied the value into its own state
+  before this package activated is beyond any repair, and the marker is what says so;
+  a profile with no gateway at all reports `host:undefined` and is not judged.
