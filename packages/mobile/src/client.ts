@@ -109,9 +109,9 @@ window.__ModuleLoader__.load({
       const image = new Image()
       image.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
       await image.decode()
-      // 1024, not the 180 of one iPhone slot: iOS only ever downsamples, and the same artwork
-      // serves iPad and the appearance previews, while this canvas costs nothing in the repo.
-      const SIZE = 1024
+      // 512: the largest slot in service is iPad Pro at 167pt x2 = 334px, and iOS only ever
+      // downsamples. 180 (the iPhone slot) is soft there; 1024 measures 47KB of data URI.
+      const SIZE = 512
       const canvas = document.createElement('canvas')
       canvas.width = SIZE
       canvas.height = SIZE
