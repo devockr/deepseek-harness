@@ -37,6 +37,8 @@ RUN groupadd app && useradd -m -g app -s /bin/bash app
 # moved: it would empty the cache on every build.
 RUN --mount=type=cache,id=apt_cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,id=apt_lists,target=/var/lib/apt/lists,sharing=locked \
+  rm -f /etc/apt/apt.conf.d/docker-clean \
+   && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache \
   apt-get update && apt-get install -y --no-install-recommends \
   bash ca-certificates curl git openssh-client util-linux
 
