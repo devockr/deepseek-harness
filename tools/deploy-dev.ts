@@ -83,22 +83,24 @@ for (const file of files) {
 const env = { UID: String(process.getuid?.() ?? ''), GID: String(process.getgid?.() ?? '') }
 const compose = (args: string[]): Promise<string> => docker(['compose', ...files.flatMap((file) => ['-f', file]), ...args], env)
 
-// 1) What would be deployed, and to which image.
-const image = /^\s*image:\s*(\S+)\s*$/m.exec(await compose(['config']))?.[1] ?? 'deepseek-harness-dsh:dev'
+// 1) What will be deployed, and to which image — read from the resolved config, so this is the
+//    deployment about to be created rather than the one that is running now.
+type Mount = { type?: string; source?: string; target?: string; read_only?: boolean }
+type Resolved = { services?: Record<string, { image?: string; volumes?: Mount[] }> }
+const resolved = JSON.parse(await compose(['config', '--format', 'json'])) as Resolved
+const service = resolved.services?.dsh ?? {}
+const image = service.image ?? 'deepseek-harness-dsh:dev'
 console.log(`deploy:dev: image ${image}`)
 
-// 2) Pre-flight: create a throwaway container with the running deployment's own binds. A bind that
-//    cannot resolve fails here, where nothing is at stake.
-let binds: string[] = []
-try {
-  binds = (await docker(['inspect', 'dsh', '--format', '{{range .HostConfig.Binds}}{{.}}\n{{end}}']))
-    .split('\n')
-    .filter((line) => line.startsWith('/'))
-    .flatMap((bind) => ['-v', bind])
-} catch {
-  console.log('deploy:dev: no running dsh container — skipping the bind pre-flight')
-}
-if (binds.length > 0) {
+// 2) Pre-flight: create a throwaway container with exactly the mounts the config declares. A bind
+//    source that does not resolve fails here, where nothing is at stake — `compose up` would fail
+//    the same way *after* removing the old container, which is what makes this worth doing.
+const binds = (service.volumes ?? [])
+  .filter((mount) => mount.source && mount.target && (mount.type === 'bind' || mount.type === 'volume'))
+  .flatMap((mount) => ['-v', `${mount.source}:${mount.target}${mount.read_only ? ':ro' : ''}`])
+if (binds.length === 0) {
+  console.log('deploy:dev: the service declares no mounts — nothing to pre-flight')
+} else {
   try {
     await docker(['run', '--rm', ...binds, '--entrypoint', 'true', image])
   } catch (error) {

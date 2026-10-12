@@ -83,8 +83,17 @@ const stop = async (error?: unknown) => {
   stopping = true
   if (error !== undefined) console.error(error)
   if (!KEEP) child?.kill('SIGTERM')
-  await forget()
-  process.exit(error === undefined ? 0 : 1)
+  // A failed cleanup is still a failure, and it must not keep the process alive: exit runs in a
+  // finally so it happens either way.
+  let status = error === undefined ? 0 : 1
+  try {
+    await forget()
+  } catch (cleanupError) {
+    console.error(cleanupError)
+    status = 1
+  } finally {
+    process.exit(status)
+  }
 }
 process.on('exit', () => {
   if (!KEEP) child?.kill('SIGTERM')
