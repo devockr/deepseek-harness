@@ -27,6 +27,7 @@
     "eslint": "^10.12.0",
     "playwright": "^1.64.0",
     "prettier": "^3.9.10",
+    "typed-query-selector": "^2.12.3",
     "typescript": "npm:@typescript/typescript6@^6",
     "typescript-eslint": "^8.71.1"
   }

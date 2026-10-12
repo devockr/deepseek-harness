@@ -4,7 +4,7 @@
     "lib": ["ES2022", "DOM"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "types": ["node"],
+    "types": ["node", "typed-query-selector"],
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,

@@ -445,7 +445,7 @@ try {
   if (SCENARIO === 'discover-settings') {
     const clicked = await page.evaluate(() => {
       const all = [
-        ...document.querySelectorAll<HTMLElement>(
+        ...document.querySelectorAll(
           'button, a, [role="button"], [role="tab"], li, span, div',
         ),
       ]
@@ -455,7 +455,7 @@ try {
       if (!el) {
         return false
       }
-      ;(el as HTMLElement).click()
+      el.click()
       return true
     })
     await page.waitForTimeout(2500)
@@ -491,7 +491,7 @@ try {
         if (!el) {
           return false
         }
-        ;(el as HTMLElement).click()
+        el.click()
         return true
       }, text)
     const themeState = () =>

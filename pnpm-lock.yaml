@@ -29,6 +29,9 @@ importers:
       prettier:
         specifier: ^3.9.10
         version: 3.9.10
+      typed-query-selector:
+        specifier: ^2.12.3
+        version: 2.12.3
       typescript:
         specifier: npm:@typescript/typescript6@^6
         version: '@typescript/typescript6@6.0.2'
@@ -2393,6 +2396,9 @@ packages:
   type-fest@5.6.0:
     resolution: {integrity: sha512-8ZiHFm91orbSAe2PSAiSVBVko18pbhbiB3U9GglSzF/zCGkR+rxpHx6sEMCUm4kxY4LjDIUGgCfUMtwfZfjfUA==}
     engines: {node: '>=20'}
+
+  typed-query-selector@2.12.3:
+    resolution: {integrity: sha512-/dtuMZyutHLlrxWhhC1uib00ELUr2dZ8C9B8YzZYsJmeE3V56OxRblrSM2UaF142pcMtak7ehZ6+poWGeehNIg==}
 
   typedarray@0.0.6:
     resolution: {integrity: sha512-/aCDEGatGvZ2BIk+HmLf4ifCJFwvKFNb9/JeZPMulfgFracn9QFcAf5GO8B/mweUjSoblS5In0cWhqpfs/5PQA==}
@@ -5150,6 +5156,8 @@ snapshots:
   type-fest@5.6.0:
     dependencies:
       tagged-tag: 1.0.0
+
+  typed-query-selector@2.12.3: {}
 
   typedarray@0.0.6: {}
 
