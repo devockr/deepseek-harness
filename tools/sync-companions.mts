@@ -10,16 +10,7 @@
  * all (so a disabled one stays disabled), files are staged and swapped in so a failed copy leaves
  * the installed package working, and the caller fixes ownership afterwards.
  */
-import {
-  cp,
-  lstat,
-  mkdir,
-  rename,
-  rm,
-  stat,
-  symlink,
-  writeFile,
-} from 'node:fs/promises'
+import fs from 'node:fs/promises'
 import path from 'node:path'
 
 interface Manifest {
@@ -34,7 +25,7 @@ interface Package {
 }
 
 const exists = async (path: string) =>
-  (await stat(path).catch(() => undefined)) !== undefined
+  (await fs.stat(path).catch(() => undefined)) !== undefined
 
 const packageOf = async (dir: string) =>
   (
@@ -96,11 +87,11 @@ const atomicReplace = async (
 ) => {
   const staging = `${target}.sync`
   const parked = `${target}.old`
-  await rm(staging, { recursive: true, force: true })
+  await fs.rm(staging, { recursive: true, force: true })
   try {
     await write(staging)
   } catch (error) {
-    await rm(staging, { recursive: true, force: true })
+    await fs.rm(staging, { recursive: true, force: true })
     throw error
   }
 
@@ -108,21 +99,21 @@ const atomicReplace = async (
   // dropped once the swap succeeded — and put back if it did not, so the installed thing is never
   // left absent for the next boot to trip over. `lstat`, because a dangling link is an entry that
   // has to be moved out of the way: renaming a directory onto it fails instead.
-  const had = (await lstat(target).catch(() => undefined)) !== undefined
-  await rm(parked, { recursive: true, force: true })
+  const had = (await fs.lstat(target).catch(() => undefined)) !== undefined
+  await fs.rm(parked, { recursive: true, force: true })
   if (had) {
-    await rename(target, parked)
+    await fs.rename(target, parked)
   }
   try {
-    await rename(staging, target)
+    await fs.rename(staging, target)
   } catch (error) {
     if (had) {
-      await rename(parked, target).catch(() => undefined)
+      await fs.rename(parked, target).catch(() => undefined)
     }
-    await rm(staging, { recursive: true, force: true })
+    await fs.rm(staging, { recursive: true, force: true })
     throw error
   }
-  await rm(parked, { recursive: true, force: true })
+  await fs.rm(parked, { recursive: true, force: true })
 }
 
 const baked = '/opt/dsh/home/.dsh/profiles/web'
@@ -188,13 +179,13 @@ if (liveModule) {
       // Both sides can be pnpm links — the destination into the live profile's store, the source
       // into the image's — so a link is recreated and files are dereferenced. The scope directory
       // may not exist yet on either path.
-      await mkdir(path.dirname(target), { recursive: true })
+      await fs.mkdir(path.dirname(target), { recursive: true })
       await atomicReplace(target, staging =>
         spec.startsWith('link:')
           ? // A link spec is written relative to the manifest that carries it, so it has to be read
             // from there — the link itself lives in the live profile's node_modules.
-            symlink(path.resolve(baked, spec.slice('link:'.length)), staging)
-          : cp(path.join(baked, 'node_modules', name), staging, {
+            fs.symlink(path.resolve(baked, spec.slice('link:'.length)), staging)
+          : fs.cp(path.join(baked, 'node_modules', name), staging, {
               recursive: true,
               dereference: true,
             }),
@@ -211,7 +202,7 @@ if (liveModule) {
 
   if (changed) {
     await atomicReplace(liveManifest, staging =>
-      writeFile(staging, `${JSON.stringify(manifest, null, 2)}\n`),
+      fs.writeFile(staging, `${JSON.stringify(manifest, null, 2)}\n`),
     )
   }
 }

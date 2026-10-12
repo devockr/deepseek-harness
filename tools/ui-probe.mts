@@ -22,7 +22,7 @@
 process.env.PLAYWRIGHT_BROWSERS_PATH ??= '/home/app/.dsh/cache/ms-playwright'
 
 import { spawn } from 'node:child_process'
-import { access, mkdir, rm, writeFile } from 'node:fs/promises'
+import fs from 'node:fs/promises'
 import path from 'node:path'
 
 const argv = process.argv.slice(2)
@@ -59,7 +59,7 @@ const HOME = process.env.PROBE_HOME ?? '/tmp/dsh-ui-probe'
 // every later run into a reuse of its leftovers.
 const HOME_EXISTED =
   process.env.PROBE_HOME != null &&
-  (await access(HOME).then(
+  (await fs.access(HOME).then(
     () => true,
     () => false,
   ))
@@ -85,7 +85,7 @@ const dshArgv = args =>
 let child
 const forget = async () => {
   if (!KEEP && !HOME_EXISTED) {
-    await rm(HOME, { recursive: true, force: true })
+    await fs.rm(HOME, { recursive: true, force: true })
   }
 }
 // Two layers, because they can do different things. "exit" cannot await, but kill() is
@@ -127,7 +127,7 @@ process.on('SIGTERM', () => void stop())
 process.on('uncaughtException', error => void stop(error))
 process.on('unhandledRejection', error => void stop(error))
 
-await mkdir(SHOTS, { recursive: true })
+await fs.mkdir(SHOTS, { recursive: true })
 
 /** Run dsh to completion, collecting both streams — the callers report status and output. */
 const run = (args, opts = {}) =>
@@ -149,12 +149,12 @@ const run = (args, opts = {}) =>
 
 /** The probe profile: created from the shipped web template, never the live one. */
 async function prepareProfile() {
-  await mkdir(HOME, { recursive: true })
+  await fs.mkdir(HOME, { recursive: true })
   // Idempotent: a crashed earlier run leaves the profile behind, and recreating it is
   // an error rather than a no-op.
   const profileManifest = path.join(HOME, 'profiles', PROFILE, 'package.json')
   if (
-    !(await access(profileManifest).then(
+    !(await fs.access(profileManifest).then(
       () => true,
       () => false,
     ))
@@ -201,7 +201,7 @@ async function boot() {
   const args = ['--profile', PROFILE]
   if (!isLoopback(HOST)) {
     const patch = path.join(HOME, 'bind-all-interfaces.patch.yml')
-    await writeFile(
+    await fs.writeFile(
       patch,
       [
         '- id: webserver',
