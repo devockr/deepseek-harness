@@ -45,7 +45,14 @@ FROM ${BASE}
 # An ARG before FROM is only usable in the FROM line, so the registry has to be declared again.
 ARG NPM_REGISTRY=https://registry.npmmirror.com/
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# apt is by far the slowest step, and the default mirror measured 11.6KB/s here against 874KB/s
+# for the one below — the same reason NPM_REGISTRY defaults to a mirror. Override with
+# `--build-arg APT_MIRROR=…`; both the deb822 and the classic source layout are handled.
+ARG APT_MIRROR=mirrors.aliyun.com
+RUN for f in /etc/apt/sources.list /etc/apt/sources.list.d/debian.sources; do \
+      if [ -f "$f" ]; then sed -i "s|deb.debian.org|${APT_MIRROR}|g; s|security.debian.org|${APT_MIRROR}|g" "$f"; fi; \
+    done \
+ && apt-get update && apt-get install -y --no-install-recommends \
       libatk-bridge2.0-0 libgbm1 libxrandr2 libxcomposite1 libxdamage1 libxfixes3 \
       libxkbcommon0 libnss3 libasound2 fonts-liberation fontconfig \
       libcups2 libcairo2 libpango-1.0-0 \
