@@ -158,11 +158,19 @@ if (dry) {
 
 // 3) Recreate. `--no-build` plus the overlay's `pull_policy: never` means this either uses the
 //    image `pnpm dev` built or fails saying so.
-console.log('deploy:dev: recreating (--no-build)')
+//
+//    The service's container is removed first, deliberately. Left in place, `up` creates the
+//    replacement under a generated name (<project>_<service>), swaps it into position and drops
+//    the old one — and a container manager watching docker events records that transient name as
+//    a container, then keeps a dead entry it can never act on (a NAS UI showing a container that
+//    does not exist). Removing the old container first leaves the name free, so `up` creates it
+//    directly and the only name anything ever sees is the real one.
+console.log('deploy:dev: recreating (remove the container, then up --no-build)')
 try {
+  await compose(['rm', '-sf', 'dsh'])
   await compose(['up', '-d', '--no-build'])
 } catch (error) {
-  die(`compose up failed:\n${stderrOf(error)}`)
+  die(`compose recreate failed:\n${stderrOf(error)}`)
 }
 
 for (let attempt = 1; attempt <= 30; attempt++) {
