@@ -14,3 +14,6 @@ docker-compose.yml
 # Never commit private keys that happen to land in the working tree.
 id_rsa
 id_ed25519
+
+# dsh packages compile src/ into lib/, and lib/ is what ships — build output, not source.
+packages/*/lib/

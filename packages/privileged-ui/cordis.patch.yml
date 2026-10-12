@@ -1,0 +1,6 @@
+# Inserts the host half. A row has to exist for the package to compose; the work
+# happens in the browser half (./client), which the host serves because of the
+# `dsh.client` declaration in package.json.
+- insert:
+    - id: privileged-ui
+      name: "@idsh/privileged-ui"

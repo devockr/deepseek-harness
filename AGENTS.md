@@ -20,17 +20,18 @@ tracked `.gitignore` already ignores `.tasks/`.
   and *strictly* — a release that cannot ship its own plugins is not a release, so the build fails
   while one is unpublished. `Dockerfile.dev` is built from the same `base` target, never from the
   published image, so it does not depend on anything being published; it adds the headless shell's
-  libraries, and bakes the same profile from this checkout's `packages/` as a `link:` — that is how a
-  deployment that mounts a checkout over `/opt/dsh/packages` runs that source and sees edits
-  immediately. A test or development convenience never goes into `Dockerfile`; the published image
+  libraries, and bakes the same profile from this checkout's `packages/` as a `link:`. A
+  deployment may mount a checkout over `/opt/dsh/packages`, but that checkout has to be **built**
+  first (`pnpm --recursive build` turns `src/` into the `lib/` the manifests name): a linked
+  package whose entry files are missing is put back to the image's copy, exactly like a broken one. A test or development convenience never goes into `Dockerfile`; the published image
   *should* fail to launch a browser.
 - **The image bakes the profile; the entrypoint keeps it to that.** A deployment with no profile gets
   the baked one, exactly as built — that is what keeps a restart free of downloads. An existing
   profile keeps the packages the image declares in the state it declares, compared by the version in
   each package's *own* `package.json`: one that is missing, declares without files, or sits below the
   image's version is put in place the way the image installed it — a `link:` when the image linked
-  (how `Dockerfile.dev` gives a deployment that mounts a checkout over `/opt/dsh/packages` source
-  whose edits show up immediately), files otherwise, and `file:` specs refreshed on every boot
+  (how `Dockerfile.dev` gives a deployment that mounts a **built** checkout over
+  `/opt/dsh/packages` source to run), files otherwise, and `file:` specs refreshed on every boot
   because their string cannot show that their files changed. One at that version or above is left
   alone, which is where a pin or a fork lives. Nothing is ever removed, and turning a package off
   means dropping it from `dsh.profile.bundles`, never uninstalling it. Nothing names a package in the
@@ -62,9 +63,15 @@ tracked `.gitignore` already ignores `.tasks/`.
 | `deepseek-harness-dsh:latest` | `:base` + a profile baked from the registry (strict) | the deployment |
 | `deepseek-harness-dsh:dev` | `:base` + those libraries; the profile baked from `packages/` | local runs and browser-driven checks |
 
-Build the base first, then the dev image: `docker build --target base -t deepseek-harness-dsh:base .`
-and `docker build -f Dockerfile.dev -t deepseek-harness-dsh:dev .`. `docker compose build` is the
-published image on its own — the one build that needs the plugins published.
+Build the dev image with `pnpm dev`: it compiles the packages (`pnpm build`), then builds `:base`
+and then `:dev` — in that order, and both orders are the point. `:base` carries `tools/` and
+`entrypoint.sh`, so a `:dev` built without rebuilding it keeps the old ones, which is a stale image
+that looks fresh; and the compiled `lib/` is what dsh loads, so `Dockerfile.dev` refuses to build a package
+that has none — or whose `src/` is newer than its `lib/`, which is what a forgotten rebuild
+looks like — rather than shipping one that cannot load, or is stale. `prepack` runs the same
+build on publish.
+`docker compose build` is the published image on its own — the one build that needs the plugins
+published.
 
 A cached layer once left a browser-dependency set inside `:latest` that the Dockerfile no longer
 declared. After an apt change, check the image instead of trusting the build; `--no-cache` when in
@@ -109,8 +116,12 @@ Observe the running thing; do not reason from source.
 
 ## Packages under `packages/`
 
-- Layout: `package.json` (`dsh.bundle.patch`, plus `dsh.client` for a browser half),
-  `cordis.patch.yml`, `lib/`, `README.md`; npm scope `@idsh`.
+- Layout: `src/index.ts` for the host half and, when there is a browser half, `src/client.ts`
+  — a plain script with no imports, because dsh serves exactly one file per package —
+  compiled by `tsc` into `lib/`, which is what `main`/`exports`/`files` name and what ships;
+  `cordis.patch.yml`, `README.md`; npm scope `@idsh`.
+- **`lib/` is build output**: gitignored, produced by `pnpm --recursive build` — the dev image
+  runs that after COPYing `packages/`, and without it a `link:` target has nothing to load.
 - A patch **replaces the row's whole `config`** — restate every key that should survive.
 - Patch YAML takes `#` comments only; `//` fails validation and the install rolls back.
 - `link:` dogfoods from source; `file:` copies.
