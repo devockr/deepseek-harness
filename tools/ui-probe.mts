@@ -490,7 +490,7 @@ try {
           ...document.querySelectorAll(
             'button, a, [role="button"], [role="tab"], li, span, div',
           ),
-        ].reverse()
+        ].toReversed()
         const el = all.find(e => (e.textContent ?? '').trim() === t)
         if (!el) {
           return false
