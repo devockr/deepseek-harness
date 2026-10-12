@@ -9,6 +9,7 @@
 // This one runs from a checkout on the host, where the root package.json makes `.ts` ESM. Tools
 // the image ships and runs itself keep the `.mts` extension: /opt/dsh/tools has no package.json,
 // so a `.ts` there would be CommonJS.
+import fs from 'node:fs/promises'
 import { execFile } from 'node:child_process'
 import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
@@ -52,7 +53,7 @@ const docker = async (args: string[], extraEnv?: Record<string, string>): Promis
     if (!dockerBin) {
       for (const candidate of candidates) {
         try {
-          await fs.promises.access(candidate, fs.constants.X_OK)
+          await fs.access(candidate, fs.constants.X_OK)
           dockerBin = candidate
           break
         } catch {
@@ -76,7 +77,7 @@ if (!process.env.DEEPSEEK_API_KEY) {
 const files = ['docker-compose.yml', 'docker-compose.dev.yml']
 for (const file of files) {
   try {
-    await fs.promises.access(path.join(repo, file))
+    await fs.access(path.join(repo, file))
   } catch {
     die(`${file} is missing next to tools/`)
   }
