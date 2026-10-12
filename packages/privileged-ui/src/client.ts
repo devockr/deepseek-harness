@@ -14,7 +14,7 @@
 //
 // This is deliberately an exception to a designed boundary. Read the package README
 // before installing it.
-window.__ModuleLoader__.load({
+globalThis.__ModuleLoader__.load({
   id: '@idsh/privileged-ui',
   factory: () => {
     const module: { exports: Record<string, unknown> } = { exports: {} }
@@ -82,7 +82,7 @@ window.__ModuleLoader__.load({
         facts !== undefined
       ) {
         try {
-          ;(facts as { isLoopback?: boolean }).isLoopback = true
+          facts.isLoopback = true
           repaired = true
         } catch {}
       }

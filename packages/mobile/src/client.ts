@@ -4,7 +4,7 @@
 // files at build time: two CSS rules injected into dist/index.html, a rewritten
 // dist/favicon.svg, and a sed-injected branch inside the composer's keydown handler.
 // Doing them here means the image can ship an untouched dsh and install a package.
-window.__ModuleLoader__.load({
+globalThis.__ModuleLoader__.load({
   id: '@idsh/mobile',
   factory: () => {
     const module: { exports: Record<string, unknown> } = { exports: {} }
@@ -63,7 +63,7 @@ window.__ModuleLoader__.load({
         if (event.isComposing || event.keyCode === 229) {
           return
         } // mid-IME
-        if (!window.matchMedia('(pointer: coarse)').matches) {
+        if (!globalThis.matchMedia('(pointer: coarse)').matches) {
           return
         }
         // Only the composer's own editor: the same rewrite on a plain input (the session
@@ -118,7 +118,7 @@ window.__ModuleLoader__.load({
       }
       const source = await (await fetch(link.href)).text()
       const svg = source
-        .replace(/(<path[^>]*)fill="#[0-9A-Fa-f]{3,6}"/g, '$1fill="#FFFFFF"')
+        .replaceAll(/(<path[^>]*)fill="#[0-9A-Fa-f]{3,6}"/g, '$1fill="#FFFFFF"')
         .replace(/(<svg[^>]*)viewBox="[^"]*"/, '$1viewBox="-7.83 -7.83 66 66"')
         .replace(
           /(<svg[^>]*)width="[0-9.]+" height="[0-9.]+"/,
@@ -155,7 +155,10 @@ window.__ModuleLoader__.load({
         rewriteEnterOnCoarsePointers(),
       ]
       let disposed = false
-      mark('css+enter coarse:' + window.matchMedia('(pointer: coarse)').matches)
+      mark(
+        'css+enter coarse:' +
+          globalThis.matchMedia('(pointer: coarse)').matches,
+      )
       rewriteHomeScreenIcon()
         .then(off => {
           // The icon arrives a fetch later, so a dispose that already happened has to undo it
