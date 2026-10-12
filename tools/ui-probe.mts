@@ -227,35 +227,44 @@ async function boot() {
     env: { ...process.env, DSH_HOME: HOME },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
-  return new Promise((resolve, reject) => {
-    let out = ''
-    const timer = setTimeout(() => {
-      child.kill('SIGTERM')
-      reject(new Error(`no readiness line in 60s:\n${out}`))
-    }, 60_000)
-    const onData = chunk => {
-      out += chunk
-      const m = /dsh web: (https?:\/\/\S+)/.exec(out)
-      if (!m) {
+  return new Promise<{ url: string; token: string | null; out: string }>(
+    (resolve, reject) => {
+      if (child === undefined) {
+        reject(new Error('dsh did not spawn'))
+
         return
       }
-      clearTimeout(timer)
-      child.stdout.off('data', onData)
-      const url = new URL(
-        isLoopback(HOST) ? m[1] : m[1].replace(/\/\/[^/:]+/, `//${HOST}`),
+
+      const proc = child
+      let out = ''
+      const timer = setTimeout(() => {
+        proc.kill('SIGTERM')
+        reject(new Error(`no readiness line in 60s:\n${out}`))
+      }, 60_000)
+      const onData = (chunk: Buffer): void => {
+        out += chunk
+        const m = /dsh web: (https?:\/\/\S+)/.exec(out)
+        if (!m) {
+          return
+        }
+        clearTimeout(timer)
+        proc.stdout?.off('data', onData)
+        const url = new URL(
+          isLoopback(HOST) ? m[1] : m[1].replace(/\/\/[^/:]+/, `//${HOST}`),
+        )
+        resolve({
+          url: url.toString(),
+          token: url.searchParams.get('token'),
+          out,
+        })
+      }
+      proc.stdout?.on('data', onData)
+      proc.stderr?.on('data', (c: Buffer) => (out += c))
+      proc.on('exit', (code: number | null) =>
+        reject(new Error(`dsh exited early (${code}):\n${out}`)),
       )
-      resolve({
-        url: url.toString(),
-        token: url.searchParams.get('token'),
-        out,
-      })
-    }
-    child.stdout.on('data', onData)
-    child.stderr.on('data', c => (out += c))
-    child.on('exit', code =>
-      reject(new Error(`dsh exited early (${code}):\n${out}`)),
-    )
-  })
+    },
+  )
 }
 
 const { chromium } = await import('playwright')
@@ -363,9 +372,9 @@ if (flag('--no-browser')) {
     )
   }
   if (KEEP) {
-    process.stdout.write(`kept: ${HOME} (pid ${child.pid})\n`)
+    process.stdout.write(`kept: ${HOME} (pid ${child?.pid})\n`)
   } else {
-    child.kill('SIGTERM')
+    child?.kill('SIGTERM')
   }
   await forget()
   process.exit(failed ? 1 : 0)
@@ -406,7 +415,7 @@ const problems = []
 let completed = false
 // Everything, not just errors: cordis reports an unmet `inject` as a warning the
 // boot audit later summarizes as a bare "failed".
-const console_all = []
+const console_all: string[] = []
 page.on('console', m => {
   console_all.push(`[${m.type()}] ${m.text()}`)
   if (m.type() === 'error') {
@@ -436,7 +445,7 @@ try {
   if (SCENARIO === 'discover-settings') {
     const clicked = await page.evaluate(() => {
       const all = [
-        ...document.querySelectorAll(
+        ...document.querySelectorAll<HTMLElement>(
           'button, a, [role="button"], [role="tab"], li, span, div',
         ),
       ]
@@ -446,7 +455,7 @@ try {
       if (!el) {
         return false
       }
-      el.click()
+      ;(el as HTMLElement).click()
       return true
     })
     await page.waitForTimeout(2500)
@@ -471,7 +480,7 @@ try {
   // Does a settings change survive a reload? That is what "host" vs "memory"
   // persistence means to a user, and it is the half the flag decides.
   if (SCENARIO === 'settings-persistence') {
-    const clickText = text =>
+    const clickText = (text: string): Promise<boolean> =>
       page.evaluate(t => {
         const all = [
           ...document.querySelectorAll(
@@ -482,7 +491,7 @@ try {
         if (!el) {
           return false
         }
-        el.click()
+        ;(el as HTMLElement).click()
         return true
       }, text)
     const themeState = () =>
@@ -559,13 +568,14 @@ try {
       // `inputType: insertLineBreak`, which is what Lexical's insertLineBreak command runs from.
       // A dispatched keyboard event cannot do this — untrusted events have no default behaviour —
       // so the recorder watches for that instead of for a rewritten keydown.
-      const enterEvents = []
-      const record = e =>
+      const enterEvents: string[] = []
+      const record = (e: KeyboardEvent): void => {
         enterEvents.push(`${e.key}${e.shiftKey ? '+shift' : ''}`)
+      }
       document.addEventListener('keydown', record)
       // The composer writes `contenteditable=""`; the `"true"` spelling is what other clients use,
       // so the composedPath lookup has to cover both.
-      const insertedBreaks = []
+      const insertedBreaks: string[] = []
       const editables = ['', 'true'].map(value => {
         const editable = document.createElement('div')
         editable.setAttribute('contenteditable', value)
@@ -593,9 +603,10 @@ try {
       }
 
       // And the other way round: a plain input (the session search) keeps its own Enter.
-      const inputSeen = []
-      const recordInput = e =>
+      const inputSeen: string[] = []
+      const recordInput = (e: KeyboardEvent): void => {
         inputSeen.push(`${e.key}${e.shiftKey ? '+shift' : ''}`)
+      }
       document.addEventListener('keydown', recordInput)
       const search = document.createElement('input')
       search.style.cssText = 'position:fixed;left:-9999px;top:0'
@@ -681,14 +692,12 @@ try {
     // never give the shell back: unref the child and end on purpose, leaving it running. `else`, not
     // an early return — a return in a finally would discard a thrown scenario's stack trace.
     process.stdout.write(
-      `kept: ${HOME} (pid ${child.pid})\n${out.slice(-400)}\n`,
+      `kept: ${HOME} (pid ${child?.pid})\n${out.slice(-400)}\n`,
     )
-    child.stdout?.unref?.()
-    child.stderr?.unref?.()
-    child.unref()
+    child?.unref()
     process.exitCode = completed ? 0 : 1
   } else {
-    child.kill('SIGTERM')
+    child?.kill('SIGTERM')
   }
   await forget()
 }
