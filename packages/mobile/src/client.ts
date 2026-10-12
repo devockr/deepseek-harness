@@ -49,6 +49,9 @@ globalThis.__ModuleLoader__.load({
      * shifted one in the capture phase, and the original is stopped before the composer's
      * handler ever sees it.
      */
+    /** The key code Safari uses for a composition being committed. */
+    const IME_PROCESSING_KEY_CODE = 229
+
     function rewriteEnterOnCoarsePointers(): Disposable {
       const onKeydown = (event: KeyboardEvent): void => {
         if (
@@ -60,7 +63,10 @@ globalThis.__ModuleLoader__.load({
         ) {
           return
         }
-        if (event.isComposing || event.keyCode === 229) {
+        // 229 is the IME processing key code Safari reports when a composition is being committed,
+        // and keyCode is the only place it appears — hence the deprecation suppression below.
+        // eslint-disable-next-line sonarjs/deprecation
+        if (event.isComposing || event.keyCode === IME_PROCESSING_KEY_CODE) {
           return
         } // mid-IME
         if (!globalThis.matchMedia('(pointer: coarse)').matches) {

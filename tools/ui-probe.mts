@@ -55,6 +55,24 @@ const isLoopback = (host: string): boolean =>
   host === '[::1]' ||
   host.startsWith('127.')
 
+// Named so the numbers say what they are: waits are for the UI to settle, and the slices are
+// how much of a long value is worth printing in a failure report.
+const READINESS_TIMEOUT_MS = 60_000
+const HTTP_SEE_OTHER = 303
+const HTTP_BAD_REQUEST = 400
+const WAIT_AFTER_LOAD_MS = 4000
+const WAIT_AFTER_CLICK_MS = 2500
+const WAIT_FOR_RENDER_MS = 2000
+const WAIT_FOR_SETTLE_MS = 5000
+const CONTEXT_BEFORE_CHARS = 60
+const CONTEXT_AFTER_CHARS = 160
+const HTML_HEAD_CHARS = 200
+const TEXT_EXCERPT_CHARS = 40
+const PARAM_EXCERPT_CHARS = 70
+const REPORT_EXCERPT_CHARS = 300
+const LOG_TAIL_LINES = 25
+const OUTPUT_TAIL_CHARS = 400
+const MATCH_WINDOW_CHARS = -25
 const HOME = process.env.PROBE_HOME ?? '/tmp/dsh-ui-probe'
 // Whether this run owns HOME. A caller-supplied PROBE_HOME can hold their own profile, so it is
 // never removed; the default directory is ours, and a run that was kept or killed must not turn
@@ -242,7 +260,7 @@ async function boot() {
       const timer = setTimeout(() => {
         proc.kill('SIGTERM')
         reject(new Error(`no readiness line in 60s:\n${out}`))
-      }, 60_000)
+      }, READINESS_TIMEOUT_MS)
       const onData = (chunk: Buffer): void => {
         out += chunk.toString()
         const m = /dsh web: (https?:\/\/\S+)/.exec(out)
@@ -299,7 +317,7 @@ if (flag('--no-browser')) {
     .map(c => c.split(';')[0])
     .filter(Boolean)
     .join('; ')
-  if (exchange.status !== 303) {
+  if (exchange.status !== HTTP_SEE_OTHER) {
     failed = true
   }
   process.stdout.write(
@@ -325,8 +343,8 @@ if (flag('--no-browser')) {
     const at = html.search(/__DSH_BOOT__/)
     process.stdout.write(
       at >= 0
-        ? `  at ${at}: ${JSON.stringify(html.slice(Math.max(0, at - 60), at + 160))}\n`
-        : `  no __DSH_BOOT__; head: ${JSON.stringify(html.slice(0, 200))}\n`,
+        ? `  at ${at}: ${JSON.stringify(html.slice(Math.max(0, at - CONTEXT_BEFORE_CHARS), at + CONTEXT_AFTER_CHARS))}\n`
+        : `  no __DSH_BOOT__; head: ${JSON.stringify(html.slice(0, HTML_HEAD_CHARS))}\n`,
     )
   }
   // remote-access is a server-side patch with no client half, so its absence from the boot graph
@@ -366,7 +384,7 @@ if (flag('--no-browser')) {
       ? u
       : origin + (u.startsWith('/') ? '' : '/') + u
     const res = await fetch(target)
-    if (res.status >= 400) {
+    if (res.status >= HTTP_BAD_REQUEST) {
       failed = true
     }
     process.stdout.write(
@@ -428,7 +446,9 @@ page.on('pageerror', e => problems.push(`pageerror: ${e.message}`))
 // Name the failing URL: a bare "502" in the console says nothing about who answered.
 page.on(
   'response',
-  r => r.status() >= 400 && problems.push(`http ${r.status()} ${r.url()}`),
+  r =>
+    r.status() >= HTTP_BAD_REQUEST &&
+    problems.push(`http ${r.status()} ${r.url()}`),
 )
 page.on('requestfailed', r =>
   problems.push(`failed ${r.url()} — ${r.failure()?.errorText ?? ''}`),
@@ -439,7 +459,7 @@ try {
   // The shell renders before the mux socket finishes its token exchange; give it a
   // moment, then describe what we actually got instead of asserting a selector we
   // guessed.
-  await page.waitForTimeout(4000)
+  await page.waitForTimeout(WAIT_AFTER_LOAD_MS)
 
   // Scenarios exist because "the flag flipped" is not the same answer as "the
   // privileged surface behaves". Discovery first: click the entry and report the
@@ -462,7 +482,7 @@ try {
       }
       return true
     })
-    await page.waitForTimeout(2500)
+    await page.waitForTimeout(WAIT_AFTER_CLICK_MS)
     const controls = await page.evaluate(() =>
       [
         ...document.querySelectorAll(
@@ -470,7 +490,10 @@ try {
         ),
       ]
         .map(e => ({
-          t: (e.textContent ?? '').replaceAll(/\s+/g, ' ').trim().slice(0, 40),
+          t: (e.textContent ?? '')
+            .replaceAll(/\s+/g, ' ')
+            .trim()
+            .slice(0, TEXT_EXCERPT_CHARS),
           r: e.getAttribute('role') ?? e.tagName,
         }))
         .filter(x => x.t),
@@ -517,18 +540,18 @@ try {
       }))
 
     process.stdout.write(`open settings: ${await clickText('Settings')}\n`)
-    await page.waitForTimeout(2000)
+    await page.waitForTimeout(WAIT_FOR_RENDER_MS)
     process.stdout.write(
       `before       : ${JSON.stringify(await themeState())}\n`,
     )
     process.stdout.write(`click DARK   : ${await clickText('Dark')}\n`)
-    await page.waitForTimeout(2500)
+    await page.waitForTimeout(WAIT_AFTER_CLICK_MS)
     process.stdout.write(
       `after click  : ${JSON.stringify(await themeState())}\n`,
     )
     await page.screenshot({ path: path.join(SHOTS, `${SHOT}-after-dark.png`) })
     await page.reload({ waitUntil: 'domcontentloaded' })
-    await page.waitForTimeout(5000)
+    await page.waitForTimeout(WAIT_FOR_SETTLE_MS)
     process.stdout.write(
       `after reload : ${JSON.stringify(await themeState())}\n`,
     )
@@ -550,7 +573,10 @@ try {
         tag: el.tagName,
         inXterm: !!el.closest('.xterm'),
         attrs: [...el.attributes]
-          .map(a => `${a.name}=${JSON.stringify(a.value.slice(0, 70))}`)
+          .map(
+            a =>
+              `${a.name}=${JSON.stringify(a.value.slice(0, PARAM_EXCERPT_CHARS))}`,
+          )
           .join(' '),
       })),
     )
@@ -675,7 +701,7 @@ try {
     dataset: { ...document.body?.dataset },
     text: (document.body?.innerText ?? '')
       .replaceAll(/\s+/g, ' ')
-      .slice(0, 300),
+      .slice(0, REPORT_EXCERPT_CHARS),
   }))
   const shot = path.join(SHOTS, `${SHOT}.png`)
   await page.screenshot({ path: shot, fullPage: false })
@@ -687,7 +713,7 @@ try {
       `visible text: ${facts.text}`,
       `screenshot  : ${shot}`,
       `problems    : ${problems.length > 0 ? '\n  ' + problems.join('\n  ') : 'none'}`,
-      `console log : ${console_all.length > 0 ? '\n  ' + console_all.slice(-25).join('\n  ') : 'none'}`,
+      `console log : ${console_all.length > 0 ? '\n  ' + console_all.slice(-LOG_TAIL_LINES).join('\n  ') : 'none'}`,
     ].join('\n') + '\n',
   )
   completed = true
@@ -698,7 +724,7 @@ try {
     // never give the shell back: unref the child and end on purpose, leaving it running. `else`, not
     // an early return — a return in a finally would discard a thrown scenario's stack trace.
     process.stdout.write(
-      `kept: ${HOME} (pid ${child?.pid})\n${out.slice(-400)}\n`,
+      `kept: ${HOME} (pid ${child?.pid})\n${out.slice(-OUTPUT_TAIL_CHARS)}\n`,
     )
     child?.unref()
     process.exitCode = completed ? 0 : 1
