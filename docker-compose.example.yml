@@ -47,14 +47,6 @@ services:
       # one is left unset rather than injected empty, and dsh reads both proxy
       # spellings and adds its own loopback bypass.
       - DEEPSEEK_API_KEY
-      # Browser downloads for Playwright, both optional. The binaries are not in
-      # either image: they live under the state directory, which is why the path
-      # below is inside it (a container rebuild then re-uses them instead of
-      # downloading again). On a slow network point PLAYWRIGHT_DOWNLOAD_HOST at a
-      # mirror — its value is machine-specific, so keep it in the real compose file
-      # or your .env, never in this template.
-      - PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH:-/home/app/.dsh/cache/ms-playwright}
-      - PLAYWRIGHT_DOWNLOAD_HOST
       - http_proxy
       - https_proxy
       - all_proxy

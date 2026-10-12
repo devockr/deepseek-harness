@@ -1,0 +1,18 @@
+# Dev overlay: browser-driven checks. Combine it with the main template:
+#
+#   docker compose -f docker-compose.example.yml -f docker-compose.dev.example.yml up -d
+#
+# It only means anything with the `:dev` image. The published image deliberately ships no
+# browser libraries — a release should fail to launch a browser rather than carry one — so
+# neither variable below does anything there.
+services:
+  dsh:
+    environment:
+      # Where the browsers live. They are in no image; this path is inside the state
+      # directory, which is bind-mounted, so a container rebuild re-uses them instead of
+      # downloading them again.
+      - PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH:-/home/app/.dsh/cache/ms-playwright}
+      # Browser binaries come from Playwright's CDN, which is slow on some networks. This is
+      # the public npmmirror of the same builds — the host NPM_REGISTRY already defaults to in
+      # both Dockerfiles. Point it elsewhere, or drop the line, if you prefer.
+      - PLAYWRIGHT_DOWNLOAD_HOST=${PLAYWRIGHT_DOWNLOAD_HOST:-https://cdn.npmmirror.com/binaries/playwright}

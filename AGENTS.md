@@ -3,9 +3,11 @@
 The parts of this repository that are easy to get wrong. `README.md` covers what it is and how to
 deploy it.
 
-**This file is public**: no hostnames, addresses, ports, ssh commands, registry mirrors, no
-reference to a file that exists on one machine only. Those go in untracked local notes — the
-tracked `.gitignore` already ignores `.tasks/`.
+**This file is public**: no hostnames, addresses, ports, ssh commands, no reference to a file
+that exists on one machine only, and none of *your own* proxy or registry settings. Those go
+in untracked local notes — the tracked `.gitignore` already ignores `.tasks/`. A public mirror
+is not one of them: both Dockerfiles already default `NPM_REGISTRY` to the same npmmirror, so
+naming a public mirror here leaks nothing.
 
 ## Invariants
 
@@ -44,8 +46,8 @@ tracked `.gitignore` already ignores `.tasks/`.
 - **The state directory is runtime state**, bind-mounted and gitignored — not a place for scripts,
   and neither is the image. Local helpers go in `.tasks/` (also gitignored); verification helpers
   stay on the machine that runs them.
-- **Machine specifics never get committed.** The real compose file is gitignored; the template is
-  `docker-compose.example.yml`.
+- **Machine specifics never get committed.** The real compose file is gitignored; the templates
+  are `docker-compose.example.yml` and its dev overlay `docker-compose.dev.example.yml`.
 - **Each image has its own ignore file**: `.dockerignore` for `Dockerfile` (which copies only
   `entrypoint.sh`), `Dockerfile.dev.dockerignore` for the dev image (`packages/`, plus the
   Dockerfile itself, which BuildKit reads from the context). Neither build carries the other's
@@ -117,8 +119,9 @@ Observe the running thing; do not reason from source.
 - Browser-driven checks run in `:dev`, not in the published image. The browser binaries are in
   neither image: they live under the state directory (`PLAYWRIGHT_BROWSERS_PATH`), which is why
   a container rebuild re-uses them, and `PLAYWRIGHT_DOWNLOAD_HOST` points a real download at a
-  mirror on a slow network. An install that was killed leaves a `__dirlock` behind and the next
-  attempt waits on it — clear that before retrying.
+  mirror on a slow network — `docker-compose.dev.example.yml` sets both, the second to the same
+  public npmmirror `NPM_REGISTRY` defaults to. An install that was killed leaves a `__dirlock`
+  behind and the next attempt waits on it — clear that before retrying.
 - For A/B work that must not touch a live deployment, boot a throwaway state directory with its
   own profile instead of the deployment's, and point the launcher at a different dsh build when
   you need one.
