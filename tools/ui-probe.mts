@@ -9,7 +9,7 @@
  * not re-download it.
  *
  * Usage:
- *   node tools/ui-probe.mjs [--install <pnpm-spec>]... [--host <host>] [--keep] [--shot <name>]
+ *   node tools/ui-probe.mts [--install <pnpm-spec>]... [--host <host>] [--keep] [--shot <name>]
  *
  * --install     add a package to the probe profile before booting (repeatable)
  * --host        the authority to browse, default 127.0.0.1; pass a LAN address to
@@ -21,9 +21,9 @@
 // mount, so the download survives `docker compose up -d --force-recreate`.
 process.env.PLAYWRIGHT_BROWSERS_PATH ??= '/home/app/.dsh/cache/ms-playwright'
 
-import { spawn, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { spawn } from 'node:child_process'
+import fs from 'node:fs'
+import path from 'node:path'
 
 const argv = process.argv.slice(2)
 const flag = (name) => argv.includes(name)
@@ -50,7 +50,8 @@ const HOME = process.env.PROBE_HOME ?? '/tmp/dsh-ui-probe'
 // Whether this run owns HOME. A caller-supplied PROBE_HOME can hold their own profile, so it is
 // never removed; the default directory is ours, and a run that was kept or killed must not turn
 // every later run into a reuse of its leftovers.
-const HOME_EXISTED = process.env.PROBE_HOME != null && existsSync(HOME)
+const HOME_EXISTED =
+  process.env.PROBE_HOME != null && (await fs.promises.access(HOME).then(() => true, () => false))
 const SHOTS = process.env.PROBE_SHOTS ?? '/home/app/.dsh/cache/ui-probe'
 const PROFILE = process.env.PROBE_PROFILE ?? 'probe'
 const HOST = values('--host')[0] ?? '127.0.0.1'
@@ -68,33 +69,54 @@ const dshArgv = (args) => (DSH.endsWith('.js') ? [process.execPath, ['--expose-i
 // early exit all land here, so nothing outlives the probe unless --keep asked for it — and a HOME
 // that was already there is not ours to delete.
 let child
-const forget = () => {
-  if (!KEEP && !HOME_EXISTED) rmSync(HOME, { recursive: true, force: true })
+const forget = async () => {
+  if (!KEEP && !HOME_EXISTED) await fs.promises.rm(HOME, { recursive: true, force: true })
 }
-process.on('exit', () => {
-  if (KEEP) return
-  child?.kill('SIGTERM')
-  forget()
-})
+// 'exit' cannot await, so cleanup happens where it can: the finally below, the explicit calls,
+// and these handlers. A SIGKILL still leaves the directory behind; the next run copes with it.
+let stopping = false
+const stop = async () => {
+  if (stopping) return
+  stopping = true
+  if (!KEEP) child?.kill('SIGTERM')
+  await forget()
+  process.exit()
+}
+process.on('SIGINT', stop)
+process.on('SIGTERM', stop)
 
-mkdirSync(SHOTS, { recursive: true })
+await fs.promises.mkdir(SHOTS, { recursive: true })
 
+/** Run dsh to completion, collecting both streams — the callers report status and output. */
 const run = (args, opts = {}) =>
-  spawnSync(...dshArgv(args), { encoding: 'utf8', env: { ...process.env, DSH_HOME: HOME }, ...opts })
+  new Promise((resolve) => {
+    const proc = spawn(...dshArgv(args), {
+      env: { ...process.env, DSH_HOME: HOME },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      ...opts,
+    })
+    let stdout = ''
+    let stderr = ''
+    proc.stdout.on('data', (chunk) => (stdout += chunk))
+    proc.stderr.on('data', (chunk) => (stderr += chunk))
+    proc.on('error', (error) => resolve({ status: 1, stdout, stderr: String(error) }))
+    proc.on('close', (status) => resolve({ status, stdout, stderr }))
+  })
 
 /** The probe profile: created from the shipped web template, never the live one. */
-function prepareProfile() {
-  mkdirSync(HOME, { recursive: true })
+async function prepareProfile() {
+  await fs.promises.mkdir(HOME, { recursive: true })
   // Idempotent: a crashed earlier run leaves the profile behind, and recreating it is
   // an error rather than a no-op.
-  if (!existsSync(join(HOME, 'profiles', PROFILE, 'package.json'))) {
-    const created = run([PROFILE, '--from-default-profile', 'web', '--dump-config'])
+  const profileManifest = path.join(HOME, 'profiles', PROFILE, 'package.json')
+  if (!(await fs.promises.access(profileManifest).then(() => true, () => false))) {
+    const created = await run([PROFILE, '--from-default-profile', 'web', '--dump-config'])
     if (created.status !== 0) {
       throw new Error(`could not create the probe profile:\n${created.stdout ?? ''}${created.stderr ?? ''}`)
     }
   }
   for (const spec of INSTALLS) {
-    const r = run(['plugin', '--profile', PROFILE, 'add', spec])
+    const r = await run(['plugin', '--profile', PROFILE, 'add', spec])
     process.stdout.write(`install ${spec}: ${r.status === 0 ? 'ok' : 'FAILED'}\n`)
     if (r.status !== 0) {
       // Booting anyway would probe a profile without the plugin the caller asked for, and still
@@ -112,14 +134,14 @@ function prepareProfile() {
  * goes in as a patch overlay (the same way a deployment does it). The `!!js` port
  * fallback keeps `--port 0` working.
  */
-function boot() {
+async function boot() {
   // Launcher options have to precede the app's: the launcher hands everything from
   // the first token it does not recognize to the app, so `--patch` must come before
   // `--port`.
   const args = ['--profile', PROFILE]
   if (!isLoopback(HOST)) {
-    const patch = join(HOME, 'bind-all-interfaces.patch.yml')
-    writeFileSync(
+    const patch = path.join(HOME, 'bind-all-interfaces.patch.yml')
+    await fs.promises.writeFile(
       patch,
       [
         '- id: webserver',
@@ -163,8 +185,14 @@ function boot() {
 
 const { chromium } = await import('playwright')
 
-prepareProfile()
-const { url, token, out } = await boot()
+await prepareProfile().catch(async (error) => {
+  await forget()
+  throw error
+})
+const { url, token, out } = await boot().catch(async (error) => {
+  await forget()
+  throw error
+})
 process.stdout.write(`probe up: ${url.replace(token ?? '', '<token>')}\n`)
 
 // Without a browser the useful half is still available: the served shell carries the
@@ -238,7 +266,7 @@ if (flag('--no-browser')) {
   } else {
     child.kill('SIGTERM')
   }
-  forget()
+  await forget()
   process.exit(failed ? 1 : 0)
 }
 
@@ -295,7 +323,7 @@ try {
         .filter((x) => x.t),
     )
     process.stdout.write(`clicked settings: ${clicked}\ncontrols:\n${controls.map((c) => `  ${c.r} — ${c.t}`).join('\n')}\n`)
-    await page.screenshot({ path: join(SHOTS, `${SHOT}-settings.png`) })
+    await page.screenshot({ path: path.join(SHOTS, `${SHOT}-settings.png`) })
   }
 
   // Does a settings change survive a reload? That is what "host" vs "memory"
@@ -326,11 +354,11 @@ try {
     process.stdout.write(`click DARK   : ${await clickText('Dark')}\n`)
     await page.waitForTimeout(2_500)
     process.stdout.write(`after click  : ${JSON.stringify(await themeState())}\n`)
-    await page.screenshot({ path: join(SHOTS, `${SHOT}-after-dark.png`) })
+    await page.screenshot({ path: path.join(SHOTS, `${SHOT}-after-dark.png`) })
     await page.reload({ waitUntil: 'domcontentloaded' })
     await page.waitForTimeout(5_000)
     process.stdout.write(`after reload : ${JSON.stringify(await themeState())}\n`)
-    await page.screenshot({ path: join(SHOTS, `${SHOT}-after-reload.png`) })
+    await page.screenshot({ path: path.join(SHOTS, `${SHOT}-after-reload.png`) })
   }
 
   // Touch behaviours: coarse-pointer CSS, and Enter meaning "line break" rather than
@@ -401,7 +429,7 @@ try {
       }
     })
     process.stdout.write(`mobile probe : ${JSON.stringify(probe)}\n`)
-    await page.screenshot({ path: join(SHOTS, `${SHOT}-mobile.png`) })
+    await page.screenshot({ path: path.join(SHOTS, `${SHOT}-mobile.png`) })
   }
 
   const facts = await page.evaluate(() => ({
@@ -411,7 +439,7 @@ try {
     dataset: { ...(document.body?.dataset ?? {}) },
     text: (document.body?.innerText ?? '').replace(/\s+/g, ' ').slice(0, 300),
   }))
-  const shot = join(SHOTS, `${SHOT}.png`)
+  const shot = path.join(SHOTS, `${SHOT}.png`)
   await page.screenshot({ path: shot, fullPage: false })
   process.stdout.write(
     [
@@ -439,5 +467,5 @@ try {
   } else {
     child.kill('SIGTERM')
   }
-  forget()
+  await forget()
 }
