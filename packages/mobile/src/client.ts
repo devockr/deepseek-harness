@@ -89,14 +89,6 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * The iOS home-screen icon, from assets/apple-touch-icon.png: iOS ignores an SVG
-     * apple-touch-icon, so the phone kept showing its own default. The placeholder is filled in
-     * by `tools/inline-icon.mts` after tsc — an image cannot be imported into a bundle that dsh
-     * serves as a single file.
-     */
-    const HOME_SCREEN_ICON = 'data:image/png;base64,__IDSH_ICON_PNG__'
-
-    /**
      * The iOS home-screen icon. iOS ignores an SVG `apple-touch-icon`, so the phone kept showing
      * its own default; this is the same artwork the favicon carries — white glyph on brand blue,
      * 180x180 — as a fixed PNG rather than something derived from the served favicon at runtime.
@@ -109,6 +101,15 @@ window.__ModuleLoader__.load({
       document.head.append(icon)
       return () => icon.remove()
     }
+
+    /**
+     * The iOS home-screen icon, from assets/apple-touch-icon.png. iOS ignores an SVG
+     * apple-touch-icon — which is why the phone kept its own default — and nothing under a
+     * plugin package is reachable by URL: the client half arrives through a bundle endpoint and
+     * every /plugins/… path answers 404 (measured, with a 200 control). So the PNG is inlined by
+     * tools/inline-icon.mts after tsc, inside the one file the browser does get.
+     */
+    const HOME_SCREEN_ICON = 'data:image/png;base64,__IDSH_ICON_PNG__'
 
     function apply(ctx: PluginContext): void {
       const teardown: Disposable[] = [injectCss(), rewriteEnterOnCoarsePointers()]
