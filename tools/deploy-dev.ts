@@ -9,15 +9,15 @@
 // This one runs from a checkout on the host, where the root package.json makes `.ts` ESM. Tools
 // the image ships and runs itself keep the `.mts` extension: /opt/dsh/tools has no package.json,
 // so a `.ts` there would be CommonJS.
-import childProcess from 'node:child_process'
+import { execFile } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import timers from 'node:timers/promises'
-import url from 'node:url'
-import util from 'node:util'
+import { setTimeout as sleep } from 'node:timers/promises'
+import { fileURLToPath } from 'node:url'
+import { promisify } from 'node:util'
 
-const execFileAsync = util.promisify(childProcess.execFile)
-const repo = path.dirname(path.dirname(url.fileURLToPath(import.meta.url)))
+const execFileAsync = promisify(execFile)
+const repo = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 const dry = process.argv.includes('--dry')
 
 const die = (message: string): never => {
@@ -133,7 +133,7 @@ for (let attempt = 1; attempt <= 30; attempt++) {
     console.log(`deploy:dev: up — ${(await docker(['inspect', 'dsh', '--format', '{{.Config.Image}}'])).trim()}`)
     process.exit(0)
   }
-  await timers.setTimeout(4000)
+  await sleep(4000)
 }
 
 die('the new container did not report "dsh web:" within two minutes — check `docker logs dsh`')
