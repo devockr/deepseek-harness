@@ -105,7 +105,13 @@ console.log(`deploy:dev: image ${image}`)
 // it would make docker create a stray volume that `--rm` leaves behind (it removes anonymous ones).
 const binds = (service.volumes ?? [])
   .filter((mount) => mount.type === 'bind' && mount.source && mount.target)
-  .flatMap((mount) => ['-v', `${mount.source}:${mount.target}${mount.read_only ? ':ro' : ''}`])
+  // --mount, not -v: it states the bind explicitly, so a path is never taken for a named volume,
+  // and a missing source is always rejected — older dockers and Docker Desktop create it for -v.
+  // This daemon rejects both; the point is that only --mount says so everywhere.
+  .flatMap((mount) => [
+    '--mount',
+    `type=bind,source=${mount.source},target=${mount.target}${mount.read_only ? ',readonly' : ''}`,
+  ])
 if (binds.length === 0) {
   console.log('deploy:dev: the service declares no mounts — nothing to pre-flight')
 } else {
