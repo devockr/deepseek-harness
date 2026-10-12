@@ -280,9 +280,12 @@ async function boot() {
       }
       proc.stdout?.on('data', onData)
       proc.stderr?.on('data', (c: Buffer) => (out += c.toString()))
-      proc.on('exit', (code: number | null) =>
-        reject(new Error(`dsh exited early (${code}):\n${out}`)),
-      )
+      proc.on('exit', (code: number | null) => {
+        // The timer would otherwise hold the event loop for its full minute and then kill a
+        // process that has already exited.
+        clearTimeout(timer)
+        reject(new Error(`dsh exited early (${code}):\n${out}`))
+      })
     },
   )
 }
