@@ -142,8 +142,8 @@ if (liveModule) {
     default: Manifest
   }
 
-  const bakedManifest = bakedModule.default as Manifest
-  const manifest = liveModule.default as Manifest
+  const bakedManifest = bakedModule.default
+  const manifest = liveModule.default
   const { dependencies } = manifest
   const { bundles } = manifest.dsh.profile
   const wasInstalled = new Set(Object.keys(dependencies))

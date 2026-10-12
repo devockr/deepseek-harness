@@ -120,9 +120,14 @@ globalThis.__ModuleLoader__.load({
     async function rewriteHomeScreenIcon(): Promise<Disposable> {
       const link = document.querySelector('link[rel~="icon"]')
       if (!(link instanceof HTMLLinkElement)) {
+        // Nothing was installed, so there is nothing to undo.
+
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+
         return () => {}
       }
-      const source = await (await fetch(link.href)).text()
+      const response = await fetch(link.href)
+      const source = await response.text()
       const svg = source
         .replaceAll(/(<path[^>]*)fill="#[0-9A-Fa-f]{3,6}"/g, '$1fill="#FFFFFF"')
         .replace(/(<svg[^>]*)viewBox="[^"]*"/, '$1viewBox="-7.83 -7.83 66 66"')
@@ -145,6 +150,10 @@ globalThis.__ModuleLoader__.load({
       canvas.height = SIZE
       const context = canvas.getContext('2d')
       if (context === null) {
+        // Nothing was installed, so there is nothing to undo.
+
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+
         return () => {}
       }
       context.drawImage(image, 0, 0, SIZE, SIZE)
