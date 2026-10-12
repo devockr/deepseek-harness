@@ -15,6 +15,6 @@ docker-compose.yml
 id_rsa
 id_ed25519
 
-# dsh packages compile src/ into lib/, and lib/ is what ships — build output, not source.
-packages/*/lib/
+# dsh packages compile src/ into lib/, and the built files are what `main`/`files` name.
+# The repository does not ignore lib/: it is in the global ignore of the machines that work here.
 

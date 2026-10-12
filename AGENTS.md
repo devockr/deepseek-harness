@@ -135,7 +135,7 @@ Observe the running thing; do not reason from source.
   — a plain script with no imports, because dsh serves exactly one file per package —
   compiled by `tsc` into `lib/`, which is what `main`/`exports`/`files` name and what ships;
   `cordis.patch.yml`, `README.md`; npm scope `@idsh`.
-- **`lib/` is build output**: gitignored, produced by `pnpm --recursive build` *before* the images
+- **`lib/` is build output**, produced by `pnpm --recursive build` *before* the images
   are built — `Dockerfile.dev` ships those compiled files and refuses to build a package whose
   `lib/index.js` is missing, or older than its `src/`, so a forgotten rebuild fails the build
   instead of shipping a `link:` target with nothing to load.
