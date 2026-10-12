@@ -5,11 +5,12 @@
 # Neither variable does anything in the published image, which has no browser libraries on purpose.
 services:
   dsh:
-    # Select the image: the base service builds the published Dockerfile, which has no browsers.
+    # Built only by `pnpm dev`, which rebuilds :base first. Never built or pulled from here:
+    # building the overlay would let a stale :base into a :dev that looks freshly built, and a
+    # missing image would silently come from a registry instead of failing.
     image: deepseek-harness-dsh:dev
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
+    pull_policy: never
+    build: !reset null
     environment:
       # Where the browsers live. They are in no image, and this path is inside the state
       # directory, so a container rebuild re-uses them instead of downloading them again.
