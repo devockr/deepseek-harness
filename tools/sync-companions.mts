@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * The companion half of entrypoint.sh, for a profile that already exists: it keeps the packages the
  * image baked in the state that image declares. A package the profile does not have, declares

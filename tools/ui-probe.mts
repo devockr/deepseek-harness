@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * Boot a throwaway `dsh web` instance and drive it with a real browser.
  *

@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 // Recreate the deployment from the `:dev` image, the way this repo intends: the dev overlay is
 // always merged in, compose never builds (`pnpm dev` does that, in that order), and the binds are
 // pre-flighted so a mistake cannot take the deployment down. `--dry` stops after the pre-flight.
