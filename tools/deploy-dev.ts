@@ -26,6 +26,7 @@ const die = (message: string): never => {
   process.exit(1)
 }
 
+
 const run = async (cmd: string, args: string[], extraEnv: Record<string, string> = {}): Promise<string> => {
   const { stdout } = await execFileAsync(cmd, args, { cwd: repo, encoding: 'utf8', env: { ...process.env, ...extraEnv } })
   return stdout
@@ -89,7 +90,13 @@ const compose = (args: string[]): Promise<string> => docker(['compose', ...files
 
 // 1) What will be deployed, and to which image — read from the resolved config, so this is the
 //    deployment about to be created rather than the one that is running now.
-type Mount = { type?: string; source?: string; target?: string; read_only?: boolean }
+type Mount = {
+  type?: string
+  source?: string
+  target?: string
+  read_only?: boolean
+  bind?: { create_host_path?: boolean }
+}
 type Resolved = { services?: Record<string, { image?: string; volumes?: Mount[] }> }
 const resolved = JSON.parse(await compose(['config', '--format', 'json'])) as Resolved
 const service = resolved.services?.dsh ?? {}
@@ -99,28 +106,45 @@ console.log(`deploy:dev: image ${image}`)
 // 2) Pre-flight: create a throwaway container with exactly the mounts the config declares. A bind
 //    source that does not resolve fails here, where nothing is at stake — `compose up` would fail
 //    the same way *after* removing the old container, which is what makes this worth doing.
-// Bind mounts only. A host path that does not resolve is the failure this pre-flight exists for:
-// `compose up` would hit it after removing the old container. A named volume cannot fail that way,
-// and its key here is the top-level short name rather than the project-scoped volume, so passing
-// it would make docker create a stray volume that `--rm` leaves behind (it removes anonymous ones).
-const binds = (service.volumes ?? [])
-  .filter((mount) => mount.type === 'bind' && mount.source && mount.target)
-  // --mount, not -v: it states the bind explicitly, so a path is never taken for a named volume,
-  // and a missing source is always rejected — older dockers and Docker Desktop create it for -v.
-  // This daemon rejects both; the point is that only --mount says so everywhere.
-  .flatMap((mount) => [
-    '--mount',
-    `type=bind,source=${mount.source},target=${mount.target}${mount.read_only ? ',readonly' : ''}`,
-  ])
-if (binds.length === 0) {
-  console.log('deploy:dev: the service declares no mounts — nothing to pre-flight')
+// Bind mounts only: a named volume cannot fail to resolve, and its key here is the top-level
+// short name rather than the project-scoped volume, so checking it would create a stray volume.
+// Of those, only the ones compose will not create itself: a short-syntax bind resolves with
+// `bind.create_host_path: true` and `compose up` makes the directory when it is missing, so
+// checking it here would refuse a deployment compose would complete. The rest are the failure
+// this pre-flight exists for — `compose up` would hit them after removing the old container.
+const mounts = (service.volumes ?? []).filter(
+  (mount) => mount.type === 'bind' && mount.source && mount.target && (mount.source ?? '').startsWith('/'),
+)
+// -v, not --mount: a leading slash means a path rather than a named volume, so the confusion that
+// bit the volume round cannot happen — and `--mount` parses its value as CSV, so a path with a
+// comma in it is a parse error there (measured on this daemon: -v mounts it, --mount refuses).
+const toArgs = (list: Mount[]): string[] =>
+  list.flatMap((mount) => ['-v', `${mount.source}:${mount.target}${mount.read_only ? ':ro' : ''}`])
+// A short-syntax bind resolves with `bind.create_host_path: true`, and `compose up` makes the
+// directory when it is missing, so refusing those would block a deployment compose would finish.
+const created = mounts.filter((mount) => mount.bind?.create_host_path === true)
+const strict = mounts.filter((mount) => mount.bind?.create_host_path !== true)
+
+if (strict.length === 0) {
+  console.log('deploy:dev: no bind needs pre-flighting')
 } else {
   try {
-    await docker(['run', '--rm', ...binds, '--entrypoint', 'true', image])
+    await docker(['run', '--rm', ...toArgs(strict), '--entrypoint', 'true', image])
   } catch (error) {
     die(`bind pre-flight failed, nothing was touched:\n${stderrOf(error)}`)
   }
   console.log('deploy:dev: bind pre-flight passed')
+}
+// The created ones are not a gate, but they are still worth seeing: the outage this pre-flight was
+// written for was exactly a bind whose source compose would have created and the daemon refused.
+if (created.length > 0) {
+  try {
+    await docker(['run', '--rm', ...toArgs(created), '--entrypoint', 'true', image])
+  } catch (error) {
+    console.log(
+      `deploy:dev: warning — compose would create ${created.length} bind source(s) the daemon refuses:\n${stderrOf(error)}`,
+    )
+  }
 }
 
 if (dry) {
