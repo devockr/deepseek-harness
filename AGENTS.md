@@ -92,6 +92,13 @@ live in the state directory, so the conversation survives, the process does not)
   means here.
 - A restart is enough when only the *profile* changed: it re-runs the entrypoint and re-resolves
   bundles. **Hot reload does not re-resolve bundles.**
+- **Compose runs as the user who owns the deployment.** `~`-relative bind sources and
+  `${UID}`/`${GID}` resolve against whoever invokes it, so the same file launched from another
+  HOME (a root container, say) binds different paths — and `docker compose up -d` removes the
+  old container *before* creating the new one, which makes that an outage rather than an error.
+  Pass the real HOME, create a throwaway container with the deployment's own bind list before
+  recreating, and prove the rollback in that same environment. The concrete commands live in
+  the local notes.
 - A detached command needs `docker` on `PATH` (or an absolute path) and stderr not discarded: a
   missing binary looks exactly like a successful restart.
 - `docker run <image> <cmd>` may hand `<cmd>` to the entrypoint as arguments. Use `--entrypoint`,
@@ -107,7 +114,11 @@ Observe the running thing; do not reason from source.
   the page over a non-loopback address.
 - Take the **newest** boot token (an older one answers 401). Logs accumulate across restarts: use
   timestamps before reading anything into a count.
-- Browser-driven checks run in `:dev`, not in the published image.
+- Browser-driven checks run in `:dev`, not in the published image. The browser binaries are in
+  neither image: they live under the state directory (`PLAYWRIGHT_BROWSERS_PATH`), which is why
+  a container rebuild re-uses them, and `PLAYWRIGHT_DOWNLOAD_HOST` points a real download at a
+  mirror on a slow network. An install that was killed leaves a `__dirlock` behind and the next
+  attempt waits on it — clear that before retrying.
 - For A/B work that must not touch a live deployment, boot a throwaway state directory with its
   own profile instead of the deployment's, and point the launcher at a different dsh build when
   you need one.
@@ -120,8 +131,10 @@ Observe the running thing; do not reason from source.
   — a plain script with no imports, because dsh serves exactly one file per package —
   compiled by `tsc` into `lib/`, which is what `main`/`exports`/`files` name and what ships;
   `cordis.patch.yml`, `README.md`; npm scope `@idsh`.
-- **`lib/` is build output**: gitignored, produced by `pnpm --recursive build` — the dev image
-  runs that after COPYing `packages/`, and without it a `link:` target has nothing to load.
+- **`lib/` is build output**: gitignored, produced by `pnpm --recursive build` *before* the images
+  are built — `Dockerfile.dev` ships those compiled files and refuses to build a package whose
+  `lib/index.js` is missing, or older than its `src/`, so a forgotten rebuild fails the build
+  instead of shipping a `link:` target with nothing to load.
 - A patch **replaces the row's whole `config`** — restate every key that should survive.
 - Patch YAML takes `#` comments only; `//` fails validation and the install rolls back.
 - `link:` dogfoods from source; `file:` copies.
