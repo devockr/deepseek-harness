@@ -99,8 +99,12 @@ console.log(`deploy:dev: image ${image}`)
 // 2) Pre-flight: create a throwaway container with exactly the mounts the config declares. A bind
 //    source that does not resolve fails here, where nothing is at stake — `compose up` would fail
 //    the same way *after* removing the old container, which is what makes this worth doing.
+// Bind mounts only. A host path that does not resolve is the failure this pre-flight exists for:
+// `compose up` would hit it after removing the old container. A named volume cannot fail that way,
+// and its key here is the top-level short name rather than the project-scoped volume, so passing
+// it would make docker create a stray volume that `--rm` leaves behind (it removes anonymous ones).
 const binds = (service.volumes ?? [])
-  .filter((mount) => mount.source && mount.target && (mount.type === 'bind' || mount.type === 'volume'))
+  .filter((mount) => mount.type === 'bind' && mount.source && mount.target)
   .flatMap((mount) => ['-v', `${mount.source}:${mount.target}${mount.read_only ? ':ro' : ''}`])
 if (binds.length === 0) {
   console.log('deploy:dev: the service declares no mounts — nothing to pre-flight')
