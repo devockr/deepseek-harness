@@ -77,7 +77,7 @@ looks like — rather than shipping one that cannot load, or is stale. `prepack`
 build on publish. The dev overlay does not build anything: it selects
 `image: deepseek-harness-dsh:dev`, refuses to pull, and resets the base service's `build`, so
 `pnpm dev` stays the only path to `:dev`, and a stale `:base` cannot end up in a `:dev` that looks
-freshly built. It needs Compose 2.24+ for `!reset`; an older one fails at parse time rather than
+freshly built. It needs Compose 2.24.4+ for `!reset`; an older one fails at parse time rather than
 building the wrong image.
 `docker compose build` is the published image on its own — the one build that needs the plugins
 published.

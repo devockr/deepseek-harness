@@ -72,18 +72,27 @@ let child
 const forget = async () => {
   if (!KEEP && !HOME_EXISTED) await rm(HOME, { recursive: true, force: true })
 }
-// 'exit' cannot await, so cleanup happens where it can: the finally below, the explicit calls,
-// and these handlers. A SIGKILL still leaves the directory behind; the next run copes with it.
+// Two layers, because they can do different things. "exit" cannot await, but kill() is
+// synchronous, so it terminates the child on every path — an unhandled rejection after boot
+// would otherwise orphan a dsh holding its port. The directory is removed where an await is
+// possible: the handlers below, the finally, and the explicit calls. A SIGKILL leaves it; the
+// next run clears it.
 let stopping = false
-const stop = async () => {
+const stop = async (error?: unknown) => {
   if (stopping) return
   stopping = true
+  if (error !== undefined) console.error(error)
   if (!KEEP) child?.kill('SIGTERM')
   await forget()
-  process.exit()
+  process.exit(error === undefined ? 0 : 1)
 }
-process.on('SIGINT', stop)
-process.on('SIGTERM', stop)
+process.on('exit', () => {
+  if (!KEEP) child?.kill('SIGTERM')
+})
+process.on('SIGINT', () => void stop())
+process.on('SIGTERM', () => void stop())
+process.on('uncaughtException', (error) => void stop(error))
+process.on('unhandledRejection', (error) => void stop(error))
 
 await mkdir(SHOTS, { recursive: true })
 
@@ -270,14 +279,21 @@ if (flag('--no-browser')) {
   process.exit(failed ? 1 : 0)
 }
 
-const browser = await chromium.launch({
-  headless: true,
-  // Chromium honours http_proxy from the environment on Linux, which turns a probe
-  // against a LAN address into a proxy request (502). Blank the variables for the
-  // browser process and tell it not to use a proxy at all.
-  env: { ...process.env, http_proxy: '', https_proxy: '', all_proxy: '', HTTP_PROXY: '', HTTPS_PROXY: '', ALL_PROXY: '' },
-  args: ['--no-sandbox', '--disable-dev-shm-usage', '--no-proxy-server'],
-})
+const browser = await chromium
+  .launch({
+    headless: true,
+    // Chromium honours http_proxy from the environment on Linux, which turns a probe
+    // against a LAN address into a proxy request (502). Blank the variables for the
+    // browser process and tell it not to use a proxy at all.
+    env: { ...process.env, http_proxy: '', https_proxy: '', all_proxy: '', HTTP_PROXY: '', HTTPS_PROXY: '', ALL_PROXY: '' },
+    args: ['--no-sandbox', '--disable-dev-shm-usage', '--no-proxy-server'],
+  })
+  // Expected to fail wherever the browser libraries are absent — the published image, say. The
+  // process exits on the unhandled rejection either way; this way the directory goes with it.
+  .catch(async (error) => {
+    await forget()
+    throw error
+  })
 // A phone, when that is the point: `hasTouch` is what makes `(pointer: coarse)` match, which is
 // the condition every touch behaviour here hangs off. `isMobile` is deliberately not set: in the
 // headless shell that emulation path dies in Skia asking fontconfig for fonts the dev image does
