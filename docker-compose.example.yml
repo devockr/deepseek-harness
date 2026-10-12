@@ -20,7 +20,7 @@ services:
     # dsh. Nothing about the uid is baked into the image, so it can be built once
     # and reused by anyone. `docker exec` therefore lands as root — use
     # `docker exec -u app ...` for a shell as the working user.
-    user: "0:0"
+    user: '0:0'
     restart: always
     # PID 1 must reap orphans: dsh's tools daemonize (wrangler, `nohup ... &`),
     # those reparent to PID 1, and Node only waits on children it spawned itself, so
@@ -33,8 +33,8 @@ services:
       # through to entrypoint.sh's ${PUID:-1000} — the container would run as uid
       # 1000. Fail loudly instead; from a shell that does not export them, use
       # `UID=$(id -u) GID=$(id -g) docker compose up -d`.
-      - "PUID=${UID:?UID is not set - export it or pass it explicitly}"
-      - "PGID=${GID:?GID is not set - export it or pass it explicitly}"
+      - 'PUID=${UID:?UID is not set - export it or pass it explicitly}'
+      - 'PGID=${GID:?GID is not set - export it or pass it explicitly}'
       # The one registry variable, from your shell or .env. entrypoint.sh turns it
       # into the user-level npm/pnpm/yarn config every project inherits, then drops
       # it; NPM_CONFIG_REGISTRY / YARN_NPM_REGISTRY_SERVER are not read, since as
@@ -52,7 +52,7 @@ services:
       - all_proxy
       - no_proxy
     ports:
-      - "15080:3080"
+      - '15080:3080'
     volumes:
       # Only dsh's own state: what else to mount is yours to decide.
       - ./.dsh:/home/app/.dsh

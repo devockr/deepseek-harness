@@ -120,12 +120,12 @@ unset NPM_REGISTRY
 #
 # /home/app and /app themselves are always ours — a non-recursive chown cannot
 # reach into the mounts below /home/app — so they go first and unconditionally.
-chown "$PUID:$PGID" /home/app /app 2>/dev/null || true
+chown "$PUID:$PGID" /home/app /app 2> /dev/null || true
 
 for f in /home/app/* /home/app/.[!.]*; do
   [ -e "$f" ] || continue
   mountpoint -q "$f" && continue
-  chown "$PUID:$PGID" "$f" 2>/dev/null || true
+  chown "$PUID:$PGID" "$f" 2> /dev/null || true
 done
 
 CRED="$HOME/.dsh/.credentials.yaml"
@@ -166,10 +166,10 @@ elif [ -d "$profile" ] && [ ! -f "$profile/package.json" ]; then
 elif [ -d /opt/dsh/home/.dsh/profiles/web/node_modules ]; then
   # Ownership is fixed whatever the script did: it replaces packages one at a time as root, so a
   # failure halfway through would otherwise leave the ones already swapped in root-owned.
-  node /opt/dsh/tools/sync-companions.mts ||
-    echo "entrypoint: could not repair the companion packages" >&2
-  chown -R "$PUID:$PGID" "$HOME/.dsh/profiles/web" ||
-    echo "entrypoint: could not fix the profile ownership" >&2
+  node /opt/dsh/tools/sync-companions.mts \
+    || echo "entrypoint: could not repair the companion packages" >&2
+  chown -R "$PUID:$PGID" "$HOME/.dsh/profiles/web" \
+    || echo "entrypoint: could not fix the profile ownership" >&2
 fi
 
 # Drop privileges before exec: dsh and everything it spawns must run as the host

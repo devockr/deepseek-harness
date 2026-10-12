@@ -26,12 +26,12 @@ import { access, mkdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
 const argv = process.argv.slice(2)
-const flag = (name) => argv.includes(name)
+const flag = name => argv.includes(name)
 /**
  * Every operand of a repeatable `name`, rejecting an absent one or a following flag: a silently
  * defaulted `--host` would probe the wrong origin, and an operand that looks like a flag is a typo.
  */
-const values = (name) => {
+const values = name => {
   const found = []
   for (let index = 0; index < argv.length; index += 1) {
     if (argv[index] !== name) {
@@ -47,15 +47,22 @@ const values = (name) => {
   return found
 }
 /** The loopback authority, however it is spelled — `localhost` is not a remote origin. */
-const isLoopback = (host) =>
-  host === 'localhost' || host === '::1' || host === '[::1]' || host.startsWith('127.')
+const isLoopback = host =>
+  host === 'localhost' ||
+  host === '::1' ||
+  host === '[::1]' ||
+  host.startsWith('127.')
 
 const HOME = process.env.PROBE_HOME ?? '/tmp/dsh-ui-probe'
 // Whether this run owns HOME. A caller-supplied PROBE_HOME can hold their own profile, so it is
 // never removed; the default directory is ours, and a run that was kept or killed must not turn
 // every later run into a reuse of its leftovers.
 const HOME_EXISTED =
-  process.env.PROBE_HOME != null && (await access(HOME).then(() => true, () => false))
+  process.env.PROBE_HOME != null &&
+  (await access(HOME).then(
+    () => true,
+    () => false,
+  ))
 const SHOTS = process.env.PROBE_SHOTS ?? '/home/app/.dsh/cache/ui-probe'
 const PROFILE = process.env.PROBE_PROFILE ?? 'probe'
 const HOST = values('--host')[0] ?? '127.0.0.1'
@@ -67,7 +74,10 @@ const SCENARIO = values('--scenario')[0]
 // looks like; without it the probe drives the installed dsh.
 const DSH = process.env.PROBE_DSH ?? 'dsh'
 // The launcher wants --expose-internals, exactly as entrypoint.sh invokes it.
-const dshArgv = (args) => (DSH.endsWith('.js') ? [process.execPath, ['--expose-internals', DSH, ...args]] : [DSH, args])
+const dshArgv = args =>
+  DSH.endsWith('.js')
+    ? [process.execPath, ['--expose-internals', DSH, ...args]]
+    : [DSH, args]
 
 // The instance is ours to clean up whatever happens: a rejected boot, a thrown scenario or an
 // early exit all land here, so nothing outlives the probe unless --keep asked for it — and a HOME
@@ -114,14 +124,14 @@ process.on('exit', () => {
 })
 process.on('SIGINT', () => void stop())
 process.on('SIGTERM', () => void stop())
-process.on('uncaughtException', (error) => void stop(error))
-process.on('unhandledRejection', (error) => void stop(error))
+process.on('uncaughtException', error => void stop(error))
+process.on('unhandledRejection', error => void stop(error))
 
 await mkdir(SHOTS, { recursive: true })
 
 /** Run dsh to completion, collecting both streams — the callers report status and output. */
 const run = (args, opts = {}) =>
-  new Promise((resolve) => {
+  new Promise(resolve => {
     const proc = spawn(...dshArgv(args), {
       env: { ...process.env, DSH_HOME: HOME },
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -129,10 +139,12 @@ const run = (args, opts = {}) =>
     })
     let stdout = ''
     let stderr = ''
-    proc.stdout.on('data', (chunk) => (stdout += chunk))
-    proc.stderr.on('data', (chunk) => (stderr += chunk))
-    proc.on('error', (error) => resolve({ status: 1, stdout, stderr: String(error) }))
-    proc.on('close', (status) => resolve({ status, stdout, stderr }))
+    proc.stdout.on('data', chunk => (stdout += chunk))
+    proc.stderr.on('data', chunk => (stderr += chunk))
+    proc.on('error', error =>
+      resolve({ status: 1, stdout, stderr: String(error) }),
+    )
+    proc.on('close', status => resolve({ status, stdout, stderr }))
   })
 
 /** The probe profile: created from the shipped web template, never the live one. */
@@ -141,19 +153,35 @@ async function prepareProfile() {
   // Idempotent: a crashed earlier run leaves the profile behind, and recreating it is
   // an error rather than a no-op.
   const profileManifest = path.join(HOME, 'profiles', PROFILE, 'package.json')
-  if (!(await access(profileManifest).then(() => true, () => false))) {
-    const created = await run([PROFILE, '--from-default-profile', 'web', '--dump-config'])
+  if (
+    !(await access(profileManifest).then(
+      () => true,
+      () => false,
+    ))
+  ) {
+    const created = await run([
+      PROFILE,
+      '--from-default-profile',
+      'web',
+      '--dump-config',
+    ])
     if (created.status !== 0) {
-      throw new Error(`could not create the probe profile:\n${created.stdout ?? ''}${created.stderr ?? ''}`)
+      throw new Error(
+        `could not create the probe profile:\n${created.stdout ?? ''}${created.stderr ?? ''}`,
+      )
     }
   }
   for (const spec of INSTALLS) {
     const r = await run(['plugin', '--profile', PROFILE, 'add', spec])
-    process.stdout.write(`install ${spec}: ${r.status === 0 ? 'ok' : 'FAILED'}\n`)
+    process.stdout.write(
+      `install ${spec}: ${r.status === 0 ? 'ok' : 'FAILED'}\n`,
+    )
     if (r.status !== 0) {
       // Booting anyway would probe a profile without the plugin the caller asked for, and still
       // exit 0 — fail here, where the message means something.
-      throw new Error(`could not install ${spec}:\n${r.stdout ?? ''}${r.stderr ?? ''}`)
+      throw new Error(
+        `could not install ${spec}:\n${r.stdout ?? ''}${r.stderr ?? ''}`,
+      )
     }
   }
 }
@@ -200,7 +228,7 @@ async function boot() {
       child.kill('SIGTERM')
       reject(new Error(`no readiness line in 60s:\n${out}`))
     }, 60_000)
-    const onData = (chunk) => {
+    const onData = chunk => {
       out += chunk
       const m = /dsh web: (https?:\/\/[^\s]+)/.exec(out)
       if (!m) {
@@ -208,22 +236,30 @@ async function boot() {
       }
       clearTimeout(timer)
       child.stdout.off('data', onData)
-      const url = new URL(isLoopback(HOST) ? m[1] : m[1].replace(/\/\/[^/:]+/, `//${HOST}`))
-      resolve({ url: url.toString(), token: url.searchParams.get('token'), out })
+      const url = new URL(
+        isLoopback(HOST) ? m[1] : m[1].replace(/\/\/[^/:]+/, `//${HOST}`),
+      )
+      resolve({
+        url: url.toString(),
+        token: url.searchParams.get('token'),
+        out,
+      })
     }
     child.stdout.on('data', onData)
-    child.stderr.on('data', (c) => (out += c))
-    child.on('exit', (code) => reject(new Error(`dsh exited early (${code}):\n${out}`)))
+    child.stderr.on('data', c => (out += c))
+    child.on('exit', code =>
+      reject(new Error(`dsh exited early (${code}):\n${out}`)),
+    )
   })
 }
 
 const { chromium } = await import('playwright')
 
-await prepareProfile().catch(async (error) => {
+await prepareProfile().catch(async error => {
   await forget()
   throw error
 })
-const { url, token, out } = await boot().catch(async (error) => {
+const { url, token, out } = await boot().catch(async error => {
   await forget()
   throw error
 })
@@ -239,24 +275,33 @@ if (flag('--no-browser')) {
   // needs that cookie. fetch follows redirects but keeps no cookie jar, so a plain
   // fetch(url) lands on the 401 page. Exchange it explicitly instead.
   const exchange = await fetch(url, { redirect: 'manual' })
-  const cookie = (exchange.headers.getSetCookie?.() ?? [exchange.headers.get('set-cookie') ?? ''])
-    .map((c) => c.split(';')[0])
+  const cookie = (
+    exchange.headers.getSetCookie?.() ?? [
+      exchange.headers.get('set-cookie') ?? '',
+    ]
+  )
+    .map(c => c.split(';')[0])
     .filter(Boolean)
     .join('; ')
   if (exchange.status !== 303) {
     failed = true
   }
-  process.stdout.write(`token       : ${exchange.status} → cookie ${cookie ? `${cookie.length} bytes` : 'NONE'}\n`)
+  process.stdout.write(
+    `token       : ${exchange.status} → cookie ${cookie ? `${cookie.length} bytes` : 'NONE'}\n`,
+  )
   const res = await fetch(`${origin}/`, { headers: { cookie } })
   const html = await res.text()
   // The shell injects it as globalThis["__DSH_BOOT__"], with `<` and `&` escaped so a
   // plugin-controlled string cannot break out of the script element.
-  const boot = /globalThis\["__DSH_BOOT__"\]\s*=\s*([\s\S]*?)\s*<\/script>/.exec(html)
+  const boot =
+    /globalThis\["__DSH_BOOT__"\]\s*=\s*([\s\S]*?)\s*<\/script>/.exec(html)
   const graph = (boot?.[1] ?? '').replace(/&amp;/g, '&').replace(/&quot;/g, '"')
   process.stdout.write(
     `shell       : ${res.status} ${res.headers.get('content-type') ?? ''} ${html.length} bytes\n`,
   )
-  process.stdout.write(`boot graph  : ${boot ? `${graph.length} bytes` : 'NOT FOUND'}\n`)
+  process.stdout.write(
+    `boot graph  : ${boot ? `${graph.length} bytes` : 'NOT FOUND'}\n`,
+  )
   if (!boot) {
     failed = true
     const at = html.search(/__DSH_BOOT__/)
@@ -281,27 +326,34 @@ if (flag('--no-browser')) {
   // URLs appear both escaped (inside the boot graph) and as plain script attributes.
   const urls = [
     ...new Set(
-      [...html.matchAll(/["']((?:plugins|\/plugins)\/[^"']+client\.js[^"']*)["']/g)]
-        .map((m) => m[1].replace(/&amp;/g, '&').replace(/&quot;/g, '"')),
+      [
+        ...html.matchAll(
+          /["']((?:plugins|\/plugins)\/[^"']+client\.js[^"']*)["']/g,
+        ),
+      ].map(m => m[1].replace(/&amp;/g, '&').replace(/&quot;/g, '"')),
     ),
   ]
   process.stdout.write(`bundle urls : ${urls.length}\n`)
   // The boot graph naming a plugin is not the same as the shell serving its bundle: a client half
   // that never made it into the composition would otherwise pass this mode silently.
   for (const wanted of ['privileged-ui', 'mobile']) {
-    const served = urls.some((u) => u.includes(`@idsh/${wanted}/client.js`))
+    const served = urls.some(u => u.includes(`@idsh/${wanted}/client.js`))
     if (!served) {
       failed = true
     }
     process.stdout.write(`bundle for ${wanted}: ${served ? 'yes' : 'NO'}\n`)
   }
   for (const u of urls) {
-    const target = u.startsWith('http') ? u : origin + (u.startsWith('/') ? '' : '/') + u
+    const target = u.startsWith('http')
+      ? u
+      : origin + (u.startsWith('/') ? '' : '/') + u
     const res = await fetch(target)
     if (res.status >= 400) {
       failed = true
     }
-    process.stdout.write(`  ${res.status} ${res.headers.get('content-type') ?? ''} ${u}\n`)
+    process.stdout.write(
+      `  ${res.status} ${res.headers.get('content-type') ?? ''} ${u}\n`,
+    )
   }
   if (KEEP) {
     process.stdout.write(`kept: ${HOME} (pid ${child.pid})\n`)
@@ -318,12 +370,20 @@ const browser = await chromium
     // Chromium honours http_proxy from the environment on Linux, which turns a probe
     // against a LAN address into a proxy request (502). Blank the variables for the
     // browser process and tell it not to use a proxy at all.
-    env: { ...process.env, http_proxy: '', https_proxy: '', all_proxy: '', HTTP_PROXY: '', HTTPS_PROXY: '', ALL_PROXY: '' },
+    env: {
+      ...process.env,
+      http_proxy: '',
+      https_proxy: '',
+      all_proxy: '',
+      HTTP_PROXY: '',
+      HTTPS_PROXY: '',
+      ALL_PROXY: '',
+    },
     args: ['--no-sandbox', '--disable-dev-shm-usage', '--no-proxy-server'],
   })
   // Expected to fail wherever the browser libraries are absent — the published image, say. The
   // process exits on the unhandled rejection either way; this way the directory goes with it.
-  .catch(async (error) => {
+  .catch(async error => {
     await forget()
     throw error
   })
@@ -332,22 +392,29 @@ const browser = await chromium
 // headless shell that emulation path dies in Skia asking fontconfig for fonts the dev image does
 // not carry, and the coarse pointer is what the plugins key off either way.
 const PHONE = { hasTouch: true, viewport: { width: 390, height: 844 } }
-const page = await browser.newPage(SCENARIO === 'mobile' ? PHONE : { viewport: { width: 1280, height: 900 } })
+const page = await browser.newPage(
+  SCENARIO === 'mobile' ? PHONE : { viewport: { width: 1280, height: 900 } },
+)
 const problems = []
 let completed = false
 // Everything, not just errors: cordis reports an unmet `inject` as a warning the
 // boot audit later summarizes as a bare "failed".
 const console_all = []
-page.on('console', (m) => {
+page.on('console', m => {
   console_all.push(`[${m.type()}] ${m.text()}`)
   if (m.type() === 'error') {
     problems.push(`console: ${m.text()}`)
   }
 })
-page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`))
+page.on('pageerror', e => problems.push(`pageerror: ${e.message}`))
 // Name the failing URL: a bare "502" in the console says nothing about who answered.
-page.on('response', (r) => r.status() >= 400 && problems.push(`http ${r.status()} ${r.url()}`))
-page.on('requestfailed', (r) => problems.push(`failed ${r.url()} — ${r.failure()?.errorText ?? ''}`))
+page.on(
+  'response',
+  r => r.status() >= 400 && problems.push(`http ${r.status()} ${r.url()}`),
+)
+page.on('requestfailed', r =>
+  problems.push(`failed ${r.url()} — ${r.failure()?.errorText ?? ''}`),
+)
 
 try {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 })
@@ -361,8 +428,14 @@ try {
   // controls, so the real assertions are written against the actual DOM.
   if (SCENARIO === 'discover-settings') {
     const clicked = await page.evaluate(() => {
-      const all = [...document.querySelectorAll('button, a, [role="button"], [role="tab"], li, span, div')]
-      const el = all.reverse().find((e) => (e.textContent ?? '').trim() === 'Settings')
+      const all = [
+        ...document.querySelectorAll(
+          'button, a, [role="button"], [role="tab"], li, span, div',
+        ),
+      ]
+      const el = all
+        .reverse()
+        .find(e => (e.textContent ?? '').trim() === 'Settings')
       if (!el) {
         return false
       }
@@ -371,21 +444,34 @@ try {
     })
     await page.waitForTimeout(2_500)
     const controls = await page.evaluate(() =>
-      [...document.querySelectorAll('button, [role="button"], [role="radio"], [role="tab"], [role="switch"], label')]
-        .map((e) => ({ t: (e.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 40), r: e.getAttribute('role') ?? e.tagName }))
-        .filter((x) => x.t),
+      [
+        ...document.querySelectorAll(
+          'button, [role="button"], [role="radio"], [role="tab"], [role="switch"], label',
+        ),
+      ]
+        .map(e => ({
+          t: (e.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 40),
+          r: e.getAttribute('role') ?? e.tagName,
+        }))
+        .filter(x => x.t),
     )
-    process.stdout.write(`clicked settings: ${clicked}\ncontrols:\n${controls.map((c) => `  ${c.r} — ${c.t}`).join('\n')}\n`)
+    process.stdout.write(
+      `clicked settings: ${clicked}\ncontrols:\n${controls.map(c => `  ${c.r} — ${c.t}`).join('\n')}\n`,
+    )
     await page.screenshot({ path: path.join(SHOTS, `${SHOT}-settings.png`) })
   }
 
   // Does a settings change survive a reload? That is what "host" vs "memory"
   // persistence means to a user, and it is the half the flag decides.
   if (SCENARIO === 'settings-persistence') {
-    const clickText = (text) =>
-      page.evaluate((t) => {
-        const all = [...document.querySelectorAll('button, a, [role="button"], [role="tab"], li, span, div')].reverse()
-        const el = all.find((e) => (e.textContent ?? '').trim() === t)
+    const clickText = text =>
+      page.evaluate(t => {
+        const all = [
+          ...document.querySelectorAll(
+            'button, a, [role="button"], [role="tab"], li, span, div',
+          ),
+        ].reverse()
+        const el = all.find(e => (e.textContent ?? '').trim() === t)
         if (!el) {
           return false
         }
@@ -399,21 +485,34 @@ try {
         scheme: getComputedStyle(document.documentElement).colorScheme,
         bg: getComputedStyle(document.body).backgroundColor,
         buttons: [...document.querySelectorAll('button')]
-          .filter((b) => ['Light', 'Dark', 'System'].includes((b.textContent ?? '').trim()))
-          .map((b) => `${(b.textContent ?? '').trim()}:${b.getAttribute('aria-pressed') ?? b.getAttribute('aria-checked') ?? b.className.slice(0, 24)}`),
+          .filter(b =>
+            ['Light', 'Dark', 'System'].includes((b.textContent ?? '').trim()),
+          )
+          .map(
+            b =>
+              `${(b.textContent ?? '').trim()}:${b.getAttribute('aria-pressed') ?? b.getAttribute('aria-checked') ?? b.className.slice(0, 24)}`,
+          ),
       }))
 
     process.stdout.write(`open settings: ${await clickText('Settings')}\n`)
     await page.waitForTimeout(2_000)
-    process.stdout.write(`before       : ${JSON.stringify(await themeState())}\n`)
+    process.stdout.write(
+      `before       : ${JSON.stringify(await themeState())}\n`,
+    )
     process.stdout.write(`click DARK   : ${await clickText('Dark')}\n`)
     await page.waitForTimeout(2_500)
-    process.stdout.write(`after click  : ${JSON.stringify(await themeState())}\n`)
+    process.stdout.write(
+      `after click  : ${JSON.stringify(await themeState())}\n`,
+    )
     await page.screenshot({ path: path.join(SHOTS, `${SHOT}-after-dark.png`) })
     await page.reload({ waitUntil: 'domcontentloaded' })
     await page.waitForTimeout(5_000)
-    process.stdout.write(`after reload : ${JSON.stringify(await themeState())}\n`)
-    await page.screenshot({ path: path.join(SHOTS, `${SHOT}-after-reload.png`) })
+    process.stdout.write(
+      `after reload : ${JSON.stringify(await themeState())}\n`,
+    )
+    await page.screenshot({
+      path: path.join(SHOTS, `${SHOT}-after-reload.png`),
+    })
   }
 
   // Touch behaviours: coarse-pointer CSS, and Enter meaning "line break" rather than
@@ -421,15 +520,21 @@ try {
   // the real page — not by reading the plugin's own source back.
   if (SCENARIO === 'discover-composer') {
     const found = await page.evaluate(() =>
-      [...document.querySelectorAll('[contenteditable="true"], textarea, input')].map((el) => ({
+      [
+        ...document.querySelectorAll(
+          '[contenteditable="true"], textarea, input',
+        ),
+      ].map(el => ({
         tag: el.tagName,
         inXterm: !!el.closest('.xterm'),
         attrs: [...el.attributes]
-          .map((a) => `${a.name}=${JSON.stringify(a.value.slice(0, 70))}`)
+          .map(a => `${a.name}=${JSON.stringify(a.value.slice(0, 70))}`)
           .join(' '),
       })),
     )
-    process.stdout.write(`editables:\n${found.map((f) => `  ${JSON.stringify(f)}`).join('\n')}\n`)
+    process.stdout.write(
+      `editables:\n${found.map(f => `  ${JSON.stringify(f)}`).join('\n')}\n`,
+    )
   }
 
   if (SCENARIO === 'mobile') {
@@ -448,20 +553,30 @@ try {
       // A dispatched keyboard event cannot do this — untrusted events have no default behaviour —
       // so the recorder watches for that instead of for a rewritten keydown.
       const enterEvents = []
-      const record = (e) => enterEvents.push(`${e.key}${e.shiftKey ? '+shift' : ''}`)
+      const record = e =>
+        enterEvents.push(`${e.key}${e.shiftKey ? '+shift' : ''}`)
       document.addEventListener('keydown', record)
       // The composer writes `contenteditable=""`; the `"true"` spelling is what other clients use,
       // so the composedPath lookup has to cover both.
       const insertedBreaks = []
-      const editables = ['', 'true'].map((value) => {
+      const editables = ['', 'true'].map(value => {
         const editable = document.createElement('div')
         editable.setAttribute('contenteditable', value)
         editable.style.cssText = 'position:fixed;left:-9999px;top:0'
-        editable.addEventListener('beforeinput', (e) => insertedBreaks.push(e.inputType))
+        editable.addEventListener('beforeinput', e =>
+          insertedBreaks.push(e.inputType),
+        )
         document.body.append(editable)
         editable.focus()
         editable.dispatchEvent(
-          new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true }),
+          new KeyboardEvent('keydown', {
+            key: 'Enter',
+            code: 'Enter',
+            keyCode: 13,
+            which: 13,
+            bubbles: true,
+            cancelable: true,
+          }),
         )
         return editable
       })
@@ -472,14 +587,22 @@ try {
 
       // And the other way round: a plain input (the session search) keeps its own Enter.
       const inputSeen = []
-      const recordInput = (e) => inputSeen.push(`${e.key}${e.shiftKey ? '+shift' : ''}`)
+      const recordInput = e =>
+        inputSeen.push(`${e.key}${e.shiftKey ? '+shift' : ''}`)
       document.addEventListener('keydown', recordInput)
       const search = document.createElement('input')
       search.style.cssText = 'position:fixed;left:-9999px;top:0'
       document.body.append(search)
       search.focus()
       search.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true }),
+        new KeyboardEvent('keydown', {
+          key: 'Enter',
+          code: 'Enter',
+          keyCode: 13,
+          which: 13,
+          bubbles: true,
+          cancelable: true,
+        }),
       )
       document.removeEventListener('keydown', recordInput)
       search.remove()
@@ -490,23 +613,32 @@ try {
         enterEvents,
         insertedBreaks,
         inputEvents: inputSeen,
-        composerEditables: document.querySelectorAll('[contenteditable]').length,
+        composerEditables:
+          document.querySelectorAll('[contenteditable]').length,
         marker: document.body.dataset.idshMobile,
-        appleTouchIcon: !!document.querySelector('link[rel="apple-touch-icon"]'),
+        appleTouchIcon: !!document.querySelector(
+          'link[rel="apple-touch-icon"]',
+        ),
       }
     })
     // The rewrite is the point of this scenario, so it has to fail the run when it stops working.
     if (probe.enterEvents.length !== 0) {
-      problems.push(`the plain Enter reached the document: ${JSON.stringify(probe.enterEvents)}`)
+      problems.push(
+        `the plain Enter reached the document: ${JSON.stringify(probe.enterEvents)}`,
+      )
     }
     if (
       probe.insertedBreaks.length !== 2 ||
-      !probe.insertedBreaks.every((inputType) => inputType === 'insertLineBreak')
+      !probe.insertedBreaks.every(inputType => inputType === 'insertLineBreak')
     ) {
-      problems.push(`the composer was not sent insertLineBreak twice: ${JSON.stringify(probe.insertedBreaks)}`)
+      problems.push(
+        `the composer was not sent insertLineBreak twice: ${JSON.stringify(probe.insertedBreaks)}`,
+      )
     }
     if (probe.inputEvents.length !== 1 || probe.inputEvents[0] !== 'Enter') {
-      problems.push(`the session-search input lost its own Enter: ${JSON.stringify(probe.inputEvents)}`)
+      problems.push(
+        `the session-search input lost its own Enter: ${JSON.stringify(probe.inputEvents)}`,
+      )
     }
     process.stdout.write(`mobile probe : ${JSON.stringify(probe)}\n`)
     await page.screenshot({ path: path.join(SHOTS, `${SHOT}-mobile.png`) })
@@ -539,7 +671,9 @@ try {
     // Printing and returning leaves the piped server attached to this process, so the probe would
     // never give the shell back: unref the child and end on purpose, leaving it running. `else`, not
     // an early return — a return in a finally would discard a thrown scenario's stack trace.
-    process.stdout.write(`kept: ${HOME} (pid ${child.pid})\n${out.slice(-400)}\n`)
+    process.stdout.write(
+      `kept: ${HOME} (pid ${child.pid})\n${out.slice(-400)}\n`,
+    )
     child.stdout?.unref?.()
     child.stderr?.unref?.()
     child.unref()

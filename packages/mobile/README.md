@@ -1,6 +1,6 @@
 ---
-description: "The touch-device half of the Web UI as a client plugin: coarse-pointer CSS, Enter inserting a line break instead of sending, and an iOS home-screen icon."
-kind: "package-bundle"
+description: 'The touch-device half of the Web UI as a client plugin: coarse-pointer CSS, Enter inserting a line break instead of sending, and an iOS home-screen icon.'
+kind: 'package-bundle'
 ---
 
 # @idsh/mobile
@@ -11,12 +11,12 @@ Three fixes for using the Web UI on a phone, all of which the self-hosted image 
 patching dsh's installed files at build time. Doing them from a client plugin means the
 image can ship an untouched dsh and install a package instead.
 
-| | Stock dsh | With this package |
-|---|---|---|
-| page panning on touch | browser default | `html { touch-action: pan-x pan-y }` under `@media (pointer: coarse)` |
-| focusing a control on iOS | Safari zooms the page, because the control is under 16px | `select, :read-write:not(.xterm-helper-textarea) { font-size: max(16px, 1em) !important }` |
-| Enter on a touch keyboard | **sends** the message (there is no Shift key to reach a newline) | inserts a line break; the send button sends |
-| home screen icon (iOS) | the stock favicon, which iOS ignores — an SVG is not a usable `apple-touch-icon` | that favicon rasterised to a 512px PNG, white glyph on a mid-tone brand-blue square |
+|                           | Stock dsh                                                                        | With this package                                                                          |
+| ------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| page panning on touch     | browser default                                                                  | `html { touch-action: pan-x pan-y }` under `@media (pointer: coarse)`                      |
+| focusing a control on iOS | Safari zooms the page, because the control is under 16px                         | `select, :read-write:not(.xterm-helper-textarea) { font-size: max(16px, 1em) !important }` |
+| Enter on a touch keyboard | **sends** the message (there is no Shift key to reach a newline)                 | inserts a line break; the send button sends                                                |
+| home screen icon (iOS)    | the stock favicon, which iOS ignores — an SVG is not a usable `apple-touch-icon` | that favicon rasterised to a 512px PNG, white glyph on a mid-tone brand-blue square        |
 
 The CSS is byte for byte what the image injected into `dist/index.html`; the composer and
 icon behaviour is the same intent, reached a different way (see below).
@@ -35,7 +35,11 @@ follow from that, and the second is the one worth remembering:
   stops the plain Enter in the capture phase and dispatches
 
   ```ts
-  new InputEvent('beforeinput', { inputType: 'insertLineBreak', bubbles: true, cancelable: true })
+  new InputEvent('beforeinput', {
+    inputType: 'insertLineBreak',
+    bubbles: true,
+    cancelable: true,
+  })
   ```
 
   which the editor accepts and turns into a real break, as

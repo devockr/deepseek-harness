@@ -1,33 +1,15 @@
 {
   "name": "@idsh/mobile",
   "version": "0.1.0",
-  "description": "The touch-device half of a dsh Web profile: coarse-pointer CSS, Enter inserting a line break instead of sending, and an iOS home-screen icon — the things the self-hosted image carried as build-time patches",
-  "license": "MIT",
   "type": "module",
-  "keywords": [
-    "dsh",
-    "deepseek-harness",
-    "cordis",
-    "bundle",
-    "client",
-    "mobile",
-    "touch"
-  ],
+  "description": "The touch-device half of a dsh Web profile: coarse-pointer CSS, Enter inserting a line break instead of sending, and an iOS home-screen icon — the things the self-hosted image carried as build-time patches",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/devockr/deepseek-harness.git",
     "directory": "packages/mobile"
   },
-  "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "prepack": "pnpm run build"
-  },
+  "license": "MIT",
   "main": "lib/index.js",
-  "files": [
-    "lib/index.js",
-    "lib/client.js",
-    "cordis.patch.yml"
-  ],
   "exports": {
     ".": {
       "default": "./lib/index.js"
@@ -37,6 +19,30 @@
     },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
+  },
+  "files": [
+    "cordis.patch.yml",
+    "lib/client.js",
+    "lib/index.js"
+  ],
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "cordis",
+    "bundle",
+    "client",
+    "mobile",
+    "touch"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepack": "pnpm run build"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.4",
+    "@deepseek-ai/dsh-api-gateway": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-connection": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-modules": "0.2.0-rc.2"
   },
   "publishConfig": {
     "access": "public"
@@ -49,11 +55,5 @@
       "platform": "web",
       "immediately": true
     }
-  },
-  "devDependencies": {
-    "@deepseek-ai/cordis": "4.0.4",
-    "@deepseek-ai/dsh-api-gateway": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-client-connection": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-client-modules": "0.2.0-rc.2"
   }
 }

@@ -1,22 +1,27 @@
 {
   "name": "deepseek-harness-plugins",
-  "private": true,
+  "type": "module",
   "description": "Companion dsh plugins for the container image in this repository",
   "license": "MIT",
-  "type": "module",
+  "private": true,
   "engines": {
     "node": ">=24"
   },
   "scripts": {
-    "dev": "pnpm build && docker build --target base -t deepseek-harness-dsh:base . && docker build -f Dockerfile.dev -t deepseek-harness-dsh:dev .",
+    "build": "pnpm --recursive --if-present --workspace-concurrency=1 run build",
     "deploy:dev": "pnpm dev && node tools/deploy-dev.ts",
     "deploy:dev:dry": "node tools/deploy-dev.ts --dry",
-    "build": "pnpm --recursive --if-present --workspace-concurrency=1 run build",
+    "dev": "pnpm build && docker build --target base -t deepseek-harness-dsh:base . && docker build -f Dockerfile.dev -t deepseek-harness-dsh:dev .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "pack": "pnpm --recursive pack",
     "publish": "pnpm --recursive publish --access public"
   },
   "devDependencies": {
+    "@1stg/prettier-config": "^5.4.0",
     "playwright": "^1.64.0",
+    "prettier": "^3.9.10",
     "typescript": "^7.0.2"
-  }
+  },
+  "prettier": "@1stg/prettier-config"
 }

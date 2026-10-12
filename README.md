@@ -47,7 +47,7 @@ Dockerized [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (
 
 The image bakes [`@idsh/remote-access`](packages/remote-access/) into a fresh profile, which binds
 the server to every interface — that is what makes the published port work at all, since a listener
-on `127.0.0.1` *inside* the container cannot receive a connection forwarded to its address. It also
+on `127.0.0.1` _inside_ the container cannot receive a connection forwarded to its address. It also
 means every LAN address reaches the UI once the port is published; read that package's security notes
 first. To keep the server on loopback instead, **disable** the package — the UI's Plugins page, or
 dropping it from `dsh.profile.bundles` — rather than uninstalling it, since a package the image
@@ -61,13 +61,13 @@ The token rotates on every restart.
 
 Environment variables (see `docker-compose.example.yml`):
 
-| Variable | Purpose | Default |
-| --- | --- | --- |
-| `DEEPSEEK_API_KEY` | DeepSeek API key — the highest-priority credential source | — |
-| `PUID` / `PGID` | uid/gid dsh runs as (and owns bind-mounted files as); compose forwards the host's `$UID`/`$GID` | `$UID` / `$GID` |
-| `NPM_REGISTRY` | npm/pnpm/yarn registry: the image build and the user-level configs use it | `https://registry.npmmirror.com/` |
-| `DSH_TRUSTED_HOSTS` | Space-separated host authorities allowed by dsh's browser-trust fence | `dsh.example.com` |
-| `http_proxy` / `https_proxy` / `all_proxy` / `no_proxy` | Outbound proxy for dsh's HTTP requests | — |
+| Variable                                                | Purpose                                                                                         | Default                           |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------- |
+| `DEEPSEEK_API_KEY`                                      | DeepSeek API key — the highest-priority credential source                                       | —                                 |
+| `PUID` / `PGID`                                         | uid/gid dsh runs as (and owns bind-mounted files as); compose forwards the host's `$UID`/`$GID` | `$UID` / `$GID`                   |
+| `NPM_REGISTRY`                                          | npm/pnpm/yarn registry: the image build and the user-level configs use it                       | `https://registry.npmmirror.com/` |
+| `DSH_TRUSTED_HOSTS`                                     | Space-separated host authorities allowed by dsh's browser-trust fence                           | `dsh.example.com`                 |
+| `http_proxy` / `https_proxy` / `all_proxy` / `no_proxy` | Outbound proxy for dsh's HTTP requests                                                          | —                                 |
 
 At boot the registry is written into `~/.npmrc`, `~/.yarnrc` and `~/.yarnrc.yml` (corepack
 and node-gyp mirrors follow), not into the environment — so a project that pins its own

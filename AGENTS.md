@@ -4,7 +4,7 @@ The parts of this repository that are easy to get wrong. `README.md` covers what
 deploy it.
 
 **This file is public**: no hostnames, addresses, ports, ssh commands, no reference to a file
-that exists on one machine only, and none of *your own* proxy or registry settings. Those go
+that exists on one machine only, and none of _your own_ proxy or registry settings. Those go
 in untracked local notes — the tracked `.gitignore` already ignores `.tasks/`. A public mirror
 is not one of them: both Dockerfiles already default `NPM_REGISTRY` to the same npmmirror, so
 naming a public mirror here leaks nothing.
@@ -19,7 +19,7 @@ naming a public mirror here leaks nothing.
   must behave differently, write a plugin.
 - **Two images, two purposes — one base.** `Dockerfile`'s `base` target is dsh + pnpm; its final
   stage is the published image: that base plus a profile baked from the registry, installed by name
-  and *strictly* — a release that cannot ship its own plugins is not a release, so the build fails
+  and _strictly_ — a release that cannot ship its own plugins is not a release, so the build fails
   while one is unpublished. `Dockerfile.dev` is built from the same `base` target, never from the
   published image, so it does not depend on anything being published; it adds the browsers'
   libraries (the headless shell's set, plus the three the full Chromium adds), and bakes the same
@@ -27,12 +27,12 @@ naming a public mirror here leaks nothing.
   `/opt/dsh/packages`, but that checkout has to be **built**
   first (`pnpm --recursive build` turns `src/` into the `lib/` the manifests name): a linked
   package whose entry files are missing is put back to the image's copy, exactly like a broken one.
-  A test or development convenience never goes into `Dockerfile`; the published image *should* fail to
+  A test or development convenience never goes into `Dockerfile`; the published image _should_ fail to
   launch a browser.
 - **The image bakes the profile; the entrypoint keeps it to that.** A deployment with no profile gets
   the baked one, exactly as built — that is what keeps a restart free of downloads. An existing
   profile keeps the packages the image declares in the state it declares, compared by the version in
-  each package's *own* `package.json`: one that is missing, declares without files, or sits below the
+  each package's _own_ `package.json`: one that is missing, declares without files, or sits below the
   image's version is put in place the way the image installed it — a `link:` when the image linked
   (how `Dockerfile.dev` gives a deployment that mounts a **built** checkout over
   `/opt/dsh/packages` source to run), files otherwise, and `file:` specs refreshed on every boot
@@ -62,11 +62,11 @@ naming a public mirror here leaks nothing.
 
 ## Images
 
-| tag | contents | used by |
-|---|---|---|
-| `deepseek-harness-dsh:base` | dsh + pnpm, nothing baked, no browser libraries | the two images below |
-| `deepseek-harness-dsh:latest` | `:base` + a profile baked from the registry (strict) | the deployment |
-| `deepseek-harness-dsh:dev` | `:base` + those libraries; the profile baked from `packages/` | local runs and browser-driven checks |
+| tag                           | contents                                                      | used by                              |
+| ----------------------------- | ------------------------------------------------------------- | ------------------------------------ |
+| `deepseek-harness-dsh:base`   | dsh + pnpm, nothing baked, no browser libraries               | the two images below                 |
+| `deepseek-harness-dsh:latest` | `:base` + a profile baked from the registry (strict)          | the deployment                       |
+| `deepseek-harness-dsh:dev`    | `:base` + those libraries; the profile baked from `packages/` | local runs and browser-driven checks |
 
 Build the dev image with `pnpm dev`: it compiles the packages (`pnpm build`), then builds `:base`
 and then `:dev` — in that order, and both orders are the point. `:base` carries `tools/` and
@@ -99,12 +99,12 @@ live in the state directory, so the conversation survives, the process does not)
 - Until the plugins are published the published image cannot be built at all, so local runs use
   `:dev` (built from `:base`, plugins from `packages/`) — which is also what "dogfood the source"
   means here.
-- A restart is enough when only the *profile* changed: it re-runs the entrypoint and re-resolves
+- A restart is enough when only the _profile_ changed: it re-runs the entrypoint and re-resolves
   bundles. **Hot reload does not re-resolve bundles.**
 - **Compose runs as the user who owns the deployment.** `~`-relative bind sources and
   `${UID}`/`${GID}` resolve against whoever invokes it, so the same file launched from another
   HOME (a root container, say) binds different paths — and `docker compose up -d` removes the
-  old container *before* creating the new one, which makes that an outage rather than an error.
+  old container _before_ creating the new one, which makes that an outage rather than an error.
   Pass the real HOME, create a throwaway container with the deployment's own bind list before
   recreating, and prove the rollback in that same environment. The concrete commands live in
   the local notes.
@@ -141,7 +141,7 @@ Observe the running thing; do not reason from source.
   — a plain script with no imports, because dsh serves exactly one file per package —
   compiled by `tsc` into `lib/`, which is what `main`/`exports`/`files` name and what ships;
   `cordis.patch.yml`, `README.md`; npm scope `@idsh`.
-- **`lib/` is build output**, produced by `pnpm --recursive build` *before* the images
+- **`lib/` is build output**, gitignored, produced by `pnpm --recursive build` _before_ the images
   are built — `Dockerfile.dev` ships those compiled files and refuses to build a package whose
   `lib/index.js` — or `lib/client.js`, when the package also has a browser half — is missing, or
   older than its `src/`, so a forgotten rebuild fails the build instead of shipping a `link:`
