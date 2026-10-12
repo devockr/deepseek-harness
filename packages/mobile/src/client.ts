@@ -89,40 +89,36 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * The iOS home-screen icon, rasterised from the favicon the app already serves — iOS ignores
-     * an SVG apple-touch-icon, and nothing under a plugin package is reachable by URL.
+     * The iOS home-screen icon. iOS ignores an SVG apple-touch-icon and nothing under a plugin
+     * package is reachable by URL, so the artwork comes from the favicon the app already serves
+     * and is rasterised here.
      *
-     * One tile, mid-tone brand blue with a light glyph, and no prefers-color-scheme variant: iOS
-     * samples the icon when the shortcut is added, so a media-gated pair would freeze whichever
-     * theme was active then, while Apple's own dark-icon treatment re-renders and swaps the
-     * background by itself. This is the palette that survives both. The SVG is rasterised at
-     * 1024 and drawn down to 180 for the same reason it always was.
+     * One tile, no prefers-color-scheme variant: iOS samples the icon when the shortcut is added,
+     * so a pair would freeze whichever theme was active then, while Apple's own dark-icon
+     * treatment swaps the background by itself. Mid-tone brand blue with a light glyph survives it.
      */
-    const TILE = '#4D6BFE'
-
-    async function rasterise(source: string): Promise<string> {
+    async function rewriteHomeScreenIcon(): Promise<Disposable> {
+      const link = document.querySelector('link[rel~="icon"]')
+      if (!(link instanceof HTMLLinkElement)) return () => {}
+      const source = await (await fetch(link.href)).text()
       const svg = source
         .replace(/(<path[^>]*)fill="#[0-9A-Fa-f]{3,6}"/g, '$1fill="#FFFFFF"')
         .replace(/(<svg[^>]*)viewBox="[^"]*"/, '$1viewBox="-7.83 -7.83 66 66"')
         .replace(/(<svg[^>]*)width="[0-9.]+" height="[0-9.]+"/, '$1width="1024" height="1024"')
-        .replace(/<path/, `<rect x="-7.83" y="-7.83" width="66" height="66" rx="12" ry="12" fill="${TILE}"/><path`)
+        .replace(/<path/, '<rect x="-7.83" y="-7.83" width="66" height="66" rx="12" ry="12" fill="#4D6BFE"/><path')
       const image = new Image()
       image.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
       await image.decode()
+      const SIZE = 180
       const canvas = document.createElement('canvas')
-      canvas.width = 180
-      canvas.height = 180
-      canvas.getContext('2d')?.drawImage(image, 0, 0, 180, 180)
-      return canvas.toDataURL('image/png')
-    }
-
-    async function rewriteHomeScreenIcon(): Promise<Disposable> {
-      const link = document.querySelector('link[rel~="icon"]')
-      if (!(link instanceof HTMLLinkElement)) return () => {}
+      canvas.width = SIZE
+      canvas.height = SIZE
+      const context = canvas.getContext('2d')
+      if (context === null) return () => {}
+      context.drawImage(image, 0, 0, SIZE, SIZE)
       const icon = document.createElement('link')
       icon.rel = 'apple-touch-icon'
-      icon.dataset.idshMobile = 'icon'
-      icon.href = await rasterise(await (await fetch(link.href)).text())
+      icon.href = canvas.toDataURL('image/png')
       document.head.append(icon)
       return () => icon.remove()
     }
