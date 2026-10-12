@@ -170,7 +170,7 @@ for (let attempt = 1; attempt <= 30; attempt++) {
   try {
     ready =
       (await docker(['inspect', 'dsh', '--format', '{{.State.Running}}'])).trim() === 'true' &&
-      (await docker(['logs', 'dsh'])).includes('dsh web:')
+      (await docker(['logs', '--tail', '100', 'dsh'])).includes('dsh web:')
   } catch {
     ready = false
   }

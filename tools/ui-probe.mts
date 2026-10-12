@@ -499,7 +499,10 @@ try {
     if (probe.enterEvents.length !== 0) {
       problems.push(`the plain Enter reached the document: ${JSON.stringify(probe.enterEvents)}`)
     }
-    if (probe.insertedBreaks.length !== 2) {
+    if (
+      probe.insertedBreaks.length !== 2 ||
+      !probe.insertedBreaks.every((inputType) => inputType === 'insertLineBreak')
+    ) {
       problems.push(`the composer was not sent insertLineBreak twice: ${JSON.stringify(probe.insertedBreaks)}`)
     }
     if (probe.inputEvents.length !== 1 || probe.inputEvents[0] !== 'Enter') {
