@@ -10,7 +10,8 @@
 // the image ships and runs itself keep the `.mts` extension: /opt/dsh/tools has no package.json,
 // so a `.ts` there would be CommonJS.
 import { execFile } from 'node:child_process'
-import fs from 'node:fs'
+import { constants } from 'node:fs'
+import { access } from 'node:fs/promises'
 import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
@@ -53,7 +54,7 @@ const docker = async (args: string[], extraEnv?: Record<string, string>): Promis
     if (!dockerBin) {
       for (const candidate of candidates) {
         try {
-          await fs.promises.access(candidate, fs.constants.X_OK)
+          await access(candidate, constants.X_OK)
           dockerBin = candidate
           break
         } catch {
@@ -73,7 +74,7 @@ if (!process.env.DEEPSEEK_API_KEY) die('DEEPSEEK_API_KEY is empty — it lives i
 const files = ['docker-compose.yml', 'docker-compose.dev.yml']
 for (const file of files) {
   try {
-    await fs.promises.access(path.join(repo, file))
+    await access(path.join(repo, file))
   } catch {
     die(`${file} is missing next to tools/`)
   }

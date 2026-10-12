@@ -22,7 +22,7 @@
 process.env.PLAYWRIGHT_BROWSERS_PATH ??= '/home/app/.dsh/cache/ms-playwright'
 
 import { spawn } from 'node:child_process'
-import fs from 'node:fs'
+import { access, mkdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
 const argv = process.argv.slice(2)
@@ -51,7 +51,7 @@ const HOME = process.env.PROBE_HOME ?? '/tmp/dsh-ui-probe'
 // never removed; the default directory is ours, and a run that was kept or killed must not turn
 // every later run into a reuse of its leftovers.
 const HOME_EXISTED =
-  process.env.PROBE_HOME != null && (await fs.promises.access(HOME).then(() => true, () => false))
+  process.env.PROBE_HOME != null && (await access(HOME).then(() => true, () => false))
 const SHOTS = process.env.PROBE_SHOTS ?? '/home/app/.dsh/cache/ui-probe'
 const PROFILE = process.env.PROBE_PROFILE ?? 'probe'
 const HOST = values('--host')[0] ?? '127.0.0.1'
@@ -70,7 +70,7 @@ const dshArgv = (args) => (DSH.endsWith('.js') ? [process.execPath, ['--expose-i
 // that was already there is not ours to delete.
 let child
 const forget = async () => {
-  if (!KEEP && !HOME_EXISTED) await fs.promises.rm(HOME, { recursive: true, force: true })
+  if (!KEEP && !HOME_EXISTED) await rm(HOME, { recursive: true, force: true })
 }
 // 'exit' cannot await, so cleanup happens where it can: the finally below, the explicit calls,
 // and these handlers. A SIGKILL still leaves the directory behind; the next run copes with it.
@@ -85,7 +85,7 @@ const stop = async () => {
 process.on('SIGINT', stop)
 process.on('SIGTERM', stop)
 
-await fs.promises.mkdir(SHOTS, { recursive: true })
+await mkdir(SHOTS, { recursive: true })
 
 /** Run dsh to completion, collecting both streams — the callers report status and output. */
 const run = (args, opts = {}) =>
@@ -105,11 +105,11 @@ const run = (args, opts = {}) =>
 
 /** The probe profile: created from the shipped web template, never the live one. */
 async function prepareProfile() {
-  await fs.promises.mkdir(HOME, { recursive: true })
+  await mkdir(HOME, { recursive: true })
   // Idempotent: a crashed earlier run leaves the profile behind, and recreating it is
   // an error rather than a no-op.
   const profileManifest = path.join(HOME, 'profiles', PROFILE, 'package.json')
-  if (!(await fs.promises.access(profileManifest).then(() => true, () => false))) {
+  if (!(await access(profileManifest).then(() => true, () => false))) {
     const created = await run([PROFILE, '--from-default-profile', 'web', '--dump-config'])
     if (created.status !== 0) {
       throw new Error(`could not create the probe profile:\n${created.stdout ?? ''}${created.stderr ?? ''}`)
@@ -141,7 +141,7 @@ async function boot() {
   const args = ['--profile', PROFILE]
   if (!isLoopback(HOST)) {
     const patch = path.join(HOME, 'bind-all-interfaces.patch.yml')
-    await fs.promises.writeFile(
+    await writeFile(
       patch,
       [
         '- id: webserver',
