@@ -27,12 +27,13 @@ interface Package {
 const exists = async (path: string) =>
   (await fs.stat(path).catch(() => {})) !== undefined
 
-const packageOf = async (dir: string) =>
-  (
-    await import(path.join(dir, 'package.json'), {
-      with: { type: 'json' },
-    }).catch(() => {})
-  )?.default as Package | undefined
+const packageOf = async (dir: string): Promise<Package | undefined> => {
+  const loaded = await import(path.join(dir, 'package.json'), {
+    with: { type: 'json' },
+  }).catch(() => undefined)
+
+  return loaded?.default as Package | undefined
+}
 
 /**
  * The files dsh itself loads: the host half (`main`, or the `.` export standing in for it) and the
@@ -131,9 +132,11 @@ const liveModule = await import(liveManifest, { with: { type: 'json' } }).catch(
 )
 
 if (liveModule) {
-  const bakedManifest = (
-    await import(path.join(baked, 'package.json'), { with: { type: 'json' } })
-  ).default as Manifest
+  const bakedModule = await import(path.join(baked, 'package.json'), {
+    with: { type: 'json' },
+  })
+
+  const bakedManifest = bakedModule.default as Manifest
   const manifest = liveModule.default as Manifest
   const { dependencies } = manifest
   const { bundles } = manifest.dsh.profile
@@ -145,17 +148,19 @@ if (liveModule) {
     const present = await exists(target)
     const installedManifest = present ? await packageOf(target) : undefined
     const installed = installedManifest?.version
-    const wanted = (await packageOf(path.join(baked, 'node_modules', name)))
-      ?.version
+    const wantedManifest = await packageOf(
+      path.join(baked, 'node_modules', name),
+    )
+
+    const wanted = wantedManifest?.version
     // A directory dsh cannot read a manifest from is no more usable than a missing one — and the
     // version comparison alone would call it equal and leave it there.
-    const absent = (
-      await Promise.all(
-        entriesOf(installedManifest).map(async entry =>
-          (await exists(path.resolve(target, entry))) ? undefined : entry,
-        ),
-      )
-    ).filter(entry => entry !== undefined)
+    const entries = await Promise.all(
+      entriesOf(installedManifest).map(async entry =>
+        (await exists(path.resolve(target, entry))) ? undefined : entry,
+      ),
+    )
+    const absent = entries.filter(entry => entry !== undefined)
     // A manifest whose own entry files are absent compiles to nothing dsh can load — which is what
     // a checkout mounted over the packages directory looks like before its build has run.
     const unusable =

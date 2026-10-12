@@ -144,8 +144,8 @@ const run = (
     })
     let stdout = ''
     let stderr = ''
-    proc.stdout?.on('data', (chunk: Buffer) => (stdout += chunk))
-    proc.stderr?.on('data', (chunk: Buffer) => (stderr += chunk))
+    proc.stdout?.on('data', (chunk: Buffer) => (stdout += chunk.toString()))
+    proc.stderr?.on('data', (chunk: Buffer) => (stderr += chunk.toString()))
     proc.on('error', (error: Error) =>
       resolve({ status: 1, stdout, stderr: String(error) }),
     )
@@ -244,7 +244,7 @@ async function boot() {
         reject(new Error(`no readiness line in 60s:\n${out}`))
       }, 60_000)
       const onData = (chunk: Buffer): void => {
-        out += chunk
+        out += chunk.toString()
         const m = /dsh web: (https?:\/\/\S+)/.exec(out)
         if (!m) {
           return
@@ -261,7 +261,7 @@ async function boot() {
         })
       }
       proc.stdout?.on('data', onData)
-      proc.stderr?.on('data', (c: Buffer) => (out += c))
+      proc.stderr?.on('data', (c: Buffer) => (out += c.toString()))
       proc.on('exit', (code: number | null) =>
         reject(new Error(`dsh exited early (${code}):\n${out}`)),
       )

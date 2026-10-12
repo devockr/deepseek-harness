@@ -239,24 +239,39 @@ try {
   )
 }
 
-for (let attempt = 1; attempt <= 30; attempt++) {
-  let ready = false
+const READINESS_ATTEMPTS = 30
+const READINESS_POLL_MS = 4000
+
+const isReady = async (): Promise<boolean> => {
   try {
-    ready =
-      (
-        await docker(['inspect', 'dsh', '--format', '{{.State.Running}}'])
-      ).trim() === 'true' &&
-      (await docker(['logs', '--tail', '100', 'dsh'])).includes('dsh web:')
+    const running = await docker([
+      'inspect',
+      'dsh',
+      '--format',
+      '{{.State.Running}}',
+    ])
+    if (running.trim() !== 'true') {
+      return false
+    }
+    const logs = await docker(['logs', '--tail', '100', 'dsh'])
+    return logs.includes('dsh web:')
   } catch {
-    ready = false
+    return false
   }
-  if (ready) {
-    console.log(
-      `deploy:dev: up — ${(await docker(['inspect', 'dsh', '--format', '{{.Config.Image}}'])).trim()}`,
-    )
+}
+
+for (let attempt = 1; attempt <= READINESS_ATTEMPTS; attempt++) {
+  if (await isReady()) {
+    const runningImage = await docker([
+      'inspect',
+      'dsh',
+      '--format',
+      '{{.Config.Image}}',
+    ])
+    console.log(`deploy:dev: up — ${runningImage.trim()}`)
     process.exit(0)
   }
-  await sleep(4000)
+  await sleep(READINESS_POLL_MS)
 }
 
 die(
