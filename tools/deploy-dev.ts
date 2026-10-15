@@ -89,14 +89,6 @@ const docker = async (
   return run(bin, args, extraEnv)
 }
 
-// compose interpolates this with `:?`; an empty one produces a container that starts but cannot
-// reach the model, which is worse than one that does not start.
-if (!process.env.DEEPSEEK_API_KEY) {
-  die(
-    'DEEPSEEK_API_KEY is empty — it lives in a login shell; run this from one',
-  )
-}
-
 const files = ['docker-compose.yml', 'docker-compose.dev.yml']
 for (const file of files) {
   try {

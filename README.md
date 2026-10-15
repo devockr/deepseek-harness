@@ -12,7 +12,8 @@ Dockerized [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (
    in this directory):
 
    ```sh
-   export UID GID
+   export UID            # both shells define the real UID
+   export GID="$(id -g)" # bash defines only UID; zsh defines GID too
    ```
 
    `.env` is gitignored, so it is safe to keep in the working directory.
