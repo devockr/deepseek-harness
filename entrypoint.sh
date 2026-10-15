@@ -172,6 +172,11 @@ elif [ -d /opt/dsh/home/.dsh/profiles/web/node_modules ]; then
     || echo "entrypoint: could not fix the profile ownership" >&2
 fi
 
+# Advertise the reverse-proxy root (alpha --public-url); no-op if unset.
+if [ -n "${DSH_PUBLIC_URL:-}" ]; then
+  set -- "$@" --public-url "$DSH_PUBLIC_URL"
+fi
+
 # Drop privileges before exec: dsh and everything it spawns must run as the host
 # user, so files written into the bind mounts belong to the host user.
 exec setpriv --reuid="$PUID" --regid="$PGID" --clear-groups \
