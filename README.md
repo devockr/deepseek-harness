@@ -49,18 +49,22 @@ Dockerized [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (
    http://<host>:15080/?token=<token>
    ```
 
-The image bakes [`@idsh/remote-access`](packages/remote-access/) into a fresh profile, which binds
-the server to every interface — that is what makes the published port work at all, since a listener
-on `127.0.0.1` _inside_ the container cannot receive a connection forwarded to its address. It also
-means every LAN address reaches the UI once the port is published; read that package's security notes
-first. To keep the server on loopback instead, **disable** the package — the UI's Plugins page, or
-dropping it from `dsh.profile.bundles` — rather than uninstalling it, since a package the image
-declares is put back on the next start; or patch the host back to `127.0.0.1`.
-With the package disabled the server is back on loopback, so reach it through the container's own
-network namespace (`docker exec`, or `docker run --network container:dsh`) — a published port
-does not carry loopback. With the package enabled, which is the default, the entrypoint hands
-dsh this container's own address instead: dsh refuses the wildcard, binds exactly one address,
-and the published port carries that one.
+The entrypoint decides what the server binds: it hands dsh this container's own address, which is
+the address a published port forwards to — a listener on `127.0.0.1` _inside_ the container cannot
+receive such a connection. An explicit `--host` wins and `DSH_BIND_HOST` overrides the choice; set
+`DSH_BIND_HOST=127.0.0.1` to keep the server on loopback, where a published port cannot reach it and
+you go through the container's own network namespace instead (`docker exec`, or
+`docker run --network container:dsh`). Binding one address means every LAN address reaches the UI
+once the port is published; read [`@idsh/remote-access`](packages/remote-access/)'s security notes
+before exposing it.
+
+The image also bakes that package into a fresh profile, where its live job is the UI's multiplexed
+WebSocket: it raises the heartbeat interval so the connection survives a stall. Its `0.0.0.0`
+fallback for the bind is unreachable, because the entrypoint already defines the address and
+0.2.1-alpha.2 and later refuse the wildcard wherever it comes from. Disabling the package — the
+UI's Plugins page, or dropping it from `dsh.profile.bundles` — therefore no longer returns the
+server to loopback; `DSH_BIND_HOST` is what does that. Nothing is uninstalled either way, since a
+package the image declares is put back on the next start.
 
 The token rotates on every restart.
 

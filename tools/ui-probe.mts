@@ -278,35 +278,24 @@ async function prepareProfile() {
 /**
  * Boot the instance, wait for the readiness line, return { url, token, child }.
  *
- * Browsing a non-loopback authority is what reproduces a remote page, and that needs the
- * server to bind one — the shipped bind is loopback and the wildcard is refused outright,
- * so the authority itself goes in as a patch overlay (the same way a deployment does it).
- * The `!!js` port fallback keeps `--port 0` working.
+ * `--host` is what defines `ctx.webStartup.host`. The baked profile ships
+ * @idsh/remote-access, whose webserver row falls back to the wildcard when that is undefined,
+ * and 0.2.1-alpha.2 and later refuse the wildcard from any layer — so leaving the bind to the
+ * profile cannot boot at all, and a patch overlay is not needed to say one concrete address.
  */
 async function boot() {
   // Launcher options have to precede the app's: the launcher hands everything from
-  // the first token it does not recognize to the app, so `--patch` must come before
+  // the first token it does not recognize to the app, so `--host` must come before
   // `--port`.
-  const args = ['--profile', PROFILE]
-  if (!isLoopback(HOST)) {
-    const patch = path.join(HOME, 'bind-authority.patch.yml')
-    await fs.writeFile(
-      patch,
-      [
-        '- id: webserver',
-        "  name: '@deepseek-ai/dsh-host-webserver'",
-        '  config:',
-        `    host: '${HOST}'`,
-        '    port: !!js ctx.webStartup.port ?? 3080',
-        '    compression: gzip',
-        '    compressionLevel: 1',
-        '    compressionThresholdBytes: 1024',
-        '',
-      ].join('\n'),
-    )
-    args.push('--patch', patch)
-  }
-  args.push('--port', '0', '--no-open')
+  const args = [
+    '--profile',
+    PROFILE,
+    '--host',
+    HOST,
+    '--port',
+    '0',
+    '--no-open',
+  ]
   child = spawn(...dshArgv(args), {
     env: { ...process.env, DSH_HOME: HOME },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -516,7 +505,7 @@ function checkMobileMarker(probe: {
   }
 }
 
-const problems = []
+const problems: string[] = []
 let completed = false
 // Everything, not just errors: cordis reports an unmet `inject` as a warning the
 // boot audit later summarizes as a bare "failed".
@@ -777,7 +766,7 @@ try {
     })
     // The rewrite is the point of this scenario, so it has to fail the run when it stops working.
     if (probe.enterEvents.length > 0) {
-      problems.push(
+      failures.push(
         `the plain Enter reached the document: ${JSON.stringify(probe.enterEvents)}`,
       )
     }
@@ -785,12 +774,12 @@ try {
       probe.insertedBreaks.length !== 2 ||
       !probe.insertedBreaks.every(inputType => inputType === 'insertLineBreak')
     ) {
-      problems.push(
+      failures.push(
         `the composer was not sent insertLineBreak twice: ${JSON.stringify(probe.insertedBreaks)}`,
       )
     }
     if (probe.inputEvents.length !== 1 || probe.inputEvents[0] !== 'Enter') {
-      problems.push(
+      failures.push(
         `the session-search input lost its own Enter: ${JSON.stringify(probe.inputEvents)}`,
       )
     }

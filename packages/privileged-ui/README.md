@@ -81,6 +81,8 @@ this package activated is beyond that repair, and the marker is what tells you s
   before this package activated is beyond any repair, and the marker is what says so;
   a profile with no gateway at all reports `host:undefined` and is not judged.
 
+### Peer ranges
+
 These packages declare dsh's own modules under `peerDependencies`, because they are only ever
 imported for types — the running dsh supplies them — and a peer range does not have to be bumped
 on every dsh release. The range is a disjunction for a reason worth keeping: npm only lets a

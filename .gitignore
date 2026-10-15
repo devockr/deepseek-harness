@@ -9,7 +9,7 @@ node_modules
 # docker-compose.example.yml. Hostnames, LAN addresses and proxy settings in it
 # are not meant to be published.
 docker-compose.yml
-# Local secrets per the README (DEEPSEEK_API_KEY / PUID / PGID).
+# Local secrets per the README (PUID / PGID).
 .env
 # Never commit private keys that happen to land in the working tree.
 id_rsa
