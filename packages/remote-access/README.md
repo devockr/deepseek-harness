@@ -7,14 +7,17 @@ kind: 'package-bundle'
 
 ## Summary
 
-Two settings that together make a dsh Web profile usable from another machine —
-both of them things dsh deliberately will not do from the command line.
+Two settings that together make a dsh Web profile usable from another machine: one of them dsh
+deliberately will not do from the command line, and the other it will no longer let anyone do.
 
-1. **Bind every interface.** The shipped `webserver` row binds `127.0.0.1`, so the
-   GUI accepts connections from its own host only. `dsh web --host 0.0.0.0` is
-   refused in code (`it would expose remote code execution to the network`), which
-   leaves a config layer as the only way to ask for it. This bundle's fallback is
-   `0.0.0.0`.
+1. **Bind an address another machine can reach.** The shipped `webserver` row binds
+   `127.0.0.1`, so the GUI accepts connections from its own host only. Until
+   **0.2.1-alpha.1** this bundle answered that by patching the row to `0.0.0.0` from a config
+   layer, because the command line refused the wildcard. **From 0.2.1-alpha.2 the value is
+   validated wherever it comes from** — `host` must be one concrete IP literal, and the
+   wildcard is refused outright — so a config layer is no longer a way around it, and this
+   bundle's `0.0.0.0` fallback can only ever fail there. See _Binding on 0.2.1-alpha.2 and
+   later_ below for what to do instead.
 2. **Keep the UI's live connection alive.** The Web UI talks to the Host over one
    multiplexed WebSocket (`/api/remote.mux`, owned by the Typert gateway). The Host
    pings it every `websocketHeartbeatIntervalMs` and terminates a socket that has
@@ -82,11 +85,11 @@ not get this for free and has to pin the picker explicitly.
 
 ## What it changes
 
-|                                                  | Shipped default | With this bundle           |
-| ------------------------------------------------ | --------------- | -------------------------- |
-| `webserver.host`                                 | `127.0.0.1`     | `0.0.0.0` (all interfaces) |
-| ping interval on the Remote mux                  | 2000ms          | 30000ms                    |
-| tolerated stall before that socket is terminated | ~4-6s           | ~60-90s                    |
+|                                                  | Shipped default | With this bundle                                                                                 |
+| ------------------------------------------------ | --------------- | ------------------------------------------------------------------------------------------------ |
+| `webserver.host`                                 | `127.0.0.1`     | `0.0.0.0` (all interfaces), or whatever `--host`/the profile names — see the version split below |
+| ping interval on the Remote mux                  | 2000ms          | 30000ms                                                                                          |
+| tolerated stall before that socket is terminated | ~4-6s           | ~60-90s                                                                                          |
 
 `webserver.port`, `compression`, `compressionLevel` and
 `compressionThresholdBytes` are restated exactly as shipped, because a patch
@@ -109,6 +112,34 @@ genuinely gone is still detected — just later.
   `--port` are still honoured, because the patch keeps the shipped `!!js`
   fallbacks (`ctx.webStartup.host ?? '0.0.0.0'`).
 
+## Binding on 0.2.1-alpha.2 and later
+
+The server takes exactly **one** concrete address there, and `dsh web --host <address>` is the
+straightforward way to give it one — this bundle's `!!js` fallback keeps an explicit `--host`
+winning, so no change to this package is needed. A profile that wants it fixed can say so in
+its own patch instead:
+
+```yaml
+# <profile>/cordis.patch.yml
+- id: webserver
+  name: '@deepseek-ai/dsh-host-webserver'
+  config:
+    # One concrete address this machine already has. The wildcard is refused from
+    # 0.2.1-alpha.2 on, and a loopback address here serves this host only.
+    host: '192.0.2.10'
+    port: !!js ctx.webStartup.port ?? 3080
+```
+
+In a container, name the container's own address, which is also what a published port forwards
+to — `dsh web --host "$(hostname -i | awk '{print $1}')"`. Either way:
+
+- **One address, so pick what you give up.** A concrete bind means nothing answers on
+  `127.0.0.1:<port>` inside that machine or network namespace any more. `--host 127.0.0.1`
+  remains the way to ask for the old behaviour, at the cost of remote reach.
+- **Keep naming the authority.** `--trusted-host <authority>` is still what the browser-trust
+  fence wants, and `--public-url <root>` is what the UI advertises — and it is required when
+  the address carries an interface zone id, which no URL can express.
+
 ## Overriding it
 
 A bundle layer sits below every user layer, so a profile that wants different
@@ -119,7 +150,7 @@ values does not have to change or remove this package:
 - id: webserver
   name: '@deepseek-ai/dsh-host-webserver'
   config:
-    host: '0.0.0.0'
+    host: '192.0.2.10'
     port: !!js ctx.webStartup.port ?? 3080
     compression: gzip
     compressionLevel: 1

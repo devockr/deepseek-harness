@@ -9,9 +9,11 @@
 - id: webserver
   name: '@deepseek-ai/dsh-host-webserver'
   config:
-    # Shipped default: 127.0.0.1. Binding every interface is what makes the Web UI
-    # reachable from another machine, and dsh refuses `--host 0.0.0.0` on the
-    # command line on purpose — a config layer is the only way to ask for it.
+    # Shipped default: 127.0.0.1. Binding an address another machine can reach is what
+    # makes the Web UI usable from elsewhere. Up to 0.2.1-alpha.1 that had to come from a
+    # config layer, since only the command line refused `--host 0.0.0.0`; from
+    # 0.2.1-alpha.2 the value is validated wherever it comes from and one concrete literal
+    # is all that is accepted, so the fallback below only applies to the older releases.
     host: !!js ctx.webStartup.host ?? '0.0.0.0'
     port: !!js ctx.webStartup.port ?? 3080
     compression: gzip
