@@ -99,4 +99,5 @@ RUN mkdir -p /opt/dsh/home \
   && dsh web --dump-config > /dev/null \
   && dsh plugin --profile web add @idsh/remote-access@0.0.0 \
   && dsh plugin --profile web add @idsh/privileged-ui@0.0.0 \
-  && test -f /opt/dsh/home/.dsh/profiles/web/package.json
+  && test -f /opt/dsh/home/.dsh/profiles/web/package.json \
+  && chmod -R a+rX /opt/dsh/home/.dsh/profiles/web

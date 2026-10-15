@@ -186,30 +186,63 @@ const run = (
     )
   })
 
-/** The plugin specs the image baked, as pnpm specs, or none when this is not running in one. */
-async function bakedSpecs(): Promise<string[]> {
-  let manifest: { dependencies?: Record<string, string> } | undefined
+/** The local-spec prefix of a dependency spec, or an empty string for anything else. */
+const localPrefix = (spec: string): string =>
+  ['link:', 'file:'].find(prefix => spec.startsWith(prefix)) ?? ''
+
+/** Read the baked manifest, and say why it could not be read when the reason is not "absent". */
+async function bakedManifest(): Promise<{
+  dependencies?: Record<string, string>
+  unreadable?: string
+}> {
   try {
-    manifest = JSON.parse(await fs.readFile(BAKED_MANIFEST, 'utf8')) as {
+    const parsed = JSON.parse(await fs.readFile(BAKED_MANIFEST, 'utf8')) as {
       dependencies?: Record<string, string>
     }
-  } catch {
-    // Not an image, or the manifest is unreadable: there is nothing to inherit.
-  }
-  const dependencies = manifest?.dependencies
-  if (!dependencies) {
-    return []
-  }
-  return Object.entries(dependencies).map(([name, spec]) => {
-    for (const local of ['link:', 'file:']) {
-      if (spec.startsWith(local)) {
-        // pnpm may write these relative to the manifest that carries them, which is why
-        // sync-companions.mts resolves them from there; an absolute one is left as it is.
-        return `${local}${path.resolve(BAKED_DIR, spec.slice(local.length))}`
+    return { dependencies: parsed.dependencies }
+  } catch (error) {
+    // Absent means this is simply not an image; anything else is a broken setup, and probing
+    // without the plugins it lists is the failure this default exists to remove.
+    if ((error as { code?: string }).code !== 'ENOENT') {
+      return {
+        unreadable: error instanceof Error ? error.message : String(error),
       }
+    }
+    return {}
+  }
+}
+
+/** The plugin specs the image baked, as pnpm specs, plus why none could be read if that happened. */
+async function bakedSpecs(): Promise<{ specs: string[]; unreadable?: string }> {
+  const { dependencies, unreadable } = await bakedManifest()
+  if (!dependencies) {
+    return { specs: [], unreadable }
+  }
+  const specs = Object.entries(dependencies).map(([name, spec]) => {
+    const local = localPrefix(spec)
+    if (local) {
+      // pnpm may write these relative to the manifest that carries them, which is why
+      // sync-companions.mts resolves them from there; an absolute one is left unchanged.
+      return `${local}${path.resolve(BAKED_DIR, spec.slice(local.length))}`
     }
     return spec.startsWith('workspace:') ? spec : `${name}@${spec}`
   })
+  return { specs, unreadable }
+}
+
+/** Report which plugin set is in play, and why none could be read when that happened. */
+function reportBaked(inherited: { specs: string[]; unreadable?: string }) {
+  const found =
+    inherited.specs.length > 0
+      ? `${inherited.specs.length} to install`
+      : 'none found'
+  const why = inherited.unreadable ? ` — ${inherited.unreadable}` : ''
+  process.stdout.write(`image plugin set: ${found}${why}\n`)
+  if (inherited.unreadable) {
+    process.stderr.write(
+      `probe: could not read the image's plugin set: ${inherited.unreadable}\n`,
+    )
+  }
 }
 
 /** The probe profile: created from the shipped web template, never the live one. */
@@ -238,14 +271,12 @@ async function prepareProfile() {
   }
   // Say which set is in play: a silent default that installed nothing looked exactly like a
   // successful run that found no plugin problems.
-  const inherited = BARE ? [] : await bakedSpecs()
+  const inherited = BARE ? { specs: [] as string[] } : await bakedSpecs()
   if (!BARE) {
-    const found =
-      inherited.length > 0 ? `${inherited.length} to install` : 'none found'
-    process.stdout.write(`image plugin set: ${found}\n`)
+    reportBaked(inherited)
   }
   const specs: Array<[string, string]> = [
-    ...inherited.map((spec): [string, string] => [spec, 'image']),
+    ...inherited.specs.map((spec): [string, string] => [spec, 'image']),
     ...INSTALLS.map((spec): [string, string] => [spec, '--install']),
   ]
   for (const [spec, source] of specs) {

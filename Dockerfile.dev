@@ -91,4 +91,5 @@ RUN mkdir -p /opt/dsh/home \
       [ -f "${d}package.json" ] && grep -q '"dsh"' "${d}package.json" || continue; \
       dsh plugin --profile web add "link:${d%/}"; \
     done \
- && test -f /opt/dsh/home/.dsh/profiles/web/package.json
+ && test -f /opt/dsh/home/.dsh/profiles/web/package.json \
+ && chmod -R a+rX /opt/dsh/home/.dsh/profiles/web
