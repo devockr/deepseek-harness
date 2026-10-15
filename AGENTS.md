@@ -11,7 +11,7 @@ naming a public mirror here leaks nothing.
 
 ## Invariants
 
-- **Compose goes through a login shell.** `${UID:?…}`/`${GID:?…}` and the proxy/API-key variables
+- **Compose goes through a login shell.** `${UID:?…}`/`${GID:?…}` and the proxy variables
   only exist there; a bare `sh` dies with `required variable UID is missing a value`. Otherwise
   pass them: `env UID="$(id -u)" GID="$(id -g)" docker compose …`.
 - **No patching dsh.** The `sed` block that rewrote `isLoopbackHostname`, the touch CSS, the

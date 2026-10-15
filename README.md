@@ -17,6 +17,10 @@ Dockerized [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (
 
    `.env` is gitignored, so it is safe to keep in the working directory.
 
+   The DeepSeek API key is **not** an environment variable: add it once the container is up, in the
+   web UI's settings. It is kept in the state directory, so it survives a rebuild and never reaches
+   the image or the process environment.
+
 2. Create your compose file from the template and build:
 
    ```sh
@@ -59,12 +63,13 @@ The token rotates on every restart.
 
 Environment variables (see `docker-compose.example.yml`):
 
-| Variable                                                | Purpose                                                                                         | Default                           |
-| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------- |
-| `PUID` / `PGID`                                         | uid/gid dsh runs as (and owns bind-mounted files as); compose forwards the host's `$UID`/`$GID` | `$UID` / `$GID`                   |
-| `NPM_REGISTRY`                                          | npm/pnpm/yarn registry: the image build and the user-level configs use it                       | `https://registry.npmmirror.com/` |
-| `DSH_TRUSTED_HOSTS`                                     | Space-separated host authorities allowed by dsh's browser-trust fence                           | `dsh.example.com`                 |
-| `http_proxy` / `https_proxy` / `all_proxy` / `no_proxy` | Outbound proxy for dsh's HTTP requests                                                          | —                                 |
+| Variable                                                | Purpose                                                                                            | Default                           |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | --------------------------------- |
+| `PUID` / `PGID`                                         | uid/gid dsh runs as (and owns bind-mounted files as); compose forwards the host's `$UID`/`$GID`    | `$UID` / `$GID`                   |
+| `NPM_REGISTRY`                                          | npm/pnpm/yarn registry: the image build and the user-level configs use it                          | `https://registry.npmmirror.com/` |
+| `DSH_TRUSTED_HOSTS`                                     | Space-separated host authorities allowed by dsh's browser-trust fence                              | `dsh.example.com`                 |
+| `DSH_PUBLIC_URL`                                        | Public HTTP(S) root to advertise behind a prefix-stripping proxy; pair it with `DSH_TRUSTED_HOSTS` | —                                 |
+| `http_proxy` / `https_proxy` / `all_proxy` / `no_proxy` | Outbound proxy for dsh's HTTP requests                                                             | —                                 |
 
 At boot the registry is written into `~/.npmrc`, `~/.yarnrc` and `~/.yarnrc.yml` (corepack
 and node-gyp mirrors follow), not into the environment — so a project that pins its own
