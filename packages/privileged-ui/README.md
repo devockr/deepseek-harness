@@ -89,3 +89,21 @@ on every dsh release. The range is a disjunction for a reason worth keeping: npm
 prerelease satisfy a range that carries a prerelease on the _same_ `major.minor.patch`, so
 `^0.2.0-rc.2` alone matches `0.2.0-rc.2` but not `0.2.1-alpha.3`. `^0.2.0-rc.2 || ^0.2.1-alpha.3`
 is the shortest form that accepts both; extend it when a new dsh line appears.
+
+Both floors are the lowest version that works, measured rather than assumed. Every candidate was
+checked twice — once with no plugins at all, once with these three installed — because a version
+that boots with none and hangs with them is incompatible, while a version that fails both ways
+would only be saying something about the harness.
+
+| dsh             | with no plugins | with these packages                       |
+| --------------- | --------------- | ----------------------------------------- |
+| `0.2.0-rc.1`    | boots           | hangs                                     |
+| `0.2.0-rc.2`    | —               | runs the deployment                       |
+| `0.2.1-alpha.1` | boots           | hangs, and one package is enough to do it |
+| `0.2.1-alpha.2` | boots           | hangs                                     |
+| `0.2.1-alpha.3` | boots           | passes the probe, markers included        |
+| `0.2.1-alpha.4` | boots           | passes the probe, markers included        |
+
+So neither floor can move down: `rc.2` is the first working version of its line and `alpha.3` of
+its. `0.1.x` is not claimed at all — it predates the `0.2` surface these packages are built
+against, and dsh refuses the install there on the strength of this same range.
