@@ -54,7 +54,7 @@ RUN --mount=type=cache,id=apt_cache,target=/var/cache/apt,sharing=locked \
 # fallback, and because it must resolve from the image's PATH: the in-app installer
 # spawns it with a scrubbed environment, so a user-prefix install is invisible.
 RUN --mount=type=cache,id=npm_cache,target=/root/.npm \
-  npm install -g --registry="$NPM_REGISTRY" @deepseek-ai/dsh@0.2.0-rc.2 pnpm@12.11.2
+  npm install -g --registry="$NPM_REGISTRY" @deepseek-ai/dsh@0.2.1-alpha.3 pnpm@12.11.2
 
 # This image used to patch dsh's installed JavaScript here: the loopback gate the
 # settings page hides behind, the touch CSS, the home-screen icon, and the composer's

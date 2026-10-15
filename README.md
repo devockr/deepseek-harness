@@ -5,15 +5,13 @@ Dockerized [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (
 ## Requirements
 
 - Docker with BuildKit + Docker Compose v2
-- A DeepSeek API key
 
 ## Getting started
 
-1. Provide the API key and host uid/gid (export them, or drop them in a `.env`
+1. Provide the host uid/gid (export them, or drop them in a `.env`
    in this directory):
 
    ```sh
-   export DEEPSEEK_API_KEY=sk-...
    export UID GID
    ```
 
@@ -63,7 +61,6 @@ Environment variables (see `docker-compose.example.yml`):
 
 | Variable                                                | Purpose                                                                                         | Default                           |
 | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------- |
-| `DEEPSEEK_API_KEY`                                      | DeepSeek API key — the highest-priority credential source                                       | —                                 |
 | `PUID` / `PGID`                                         | uid/gid dsh runs as (and owns bind-mounted files as); compose forwards the host's `$UID`/`$GID` | `$UID` / `$GID`                   |
 | `NPM_REGISTRY`                                          | npm/pnpm/yarn registry: the image build and the user-level configs use it                       | `https://registry.npmmirror.com/` |
 | `DSH_TRUSTED_HOSTS`                                     | Space-separated host authorities allowed by dsh's browser-trust fence                           | `dsh.example.com`                 |

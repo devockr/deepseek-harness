@@ -46,7 +46,8 @@ services:
       # Your key and the proxy settings, likewise from your shell or .env: an unset
       # one is left unset rather than injected empty, and dsh reads both proxy
       # spellings and adds its own loopback bypass.
-      - DEEPSEEK_API_KEY
+      # Note: The DeepSeek API key is no longer set via environment variable.
+      # Add it manually in dsh settings instead to prevent exposure to the image.
       - http_proxy
       - https_proxy
       - all_proxy
