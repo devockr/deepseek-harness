@@ -761,6 +761,21 @@ try {
     await page.screenshot({ path: path.join(SHOTS, `${SHOT}-mobile.png`) })
   }
 
+  // `mark()` writes the mobile marker twice: the CSS half first, the icon once the artwork is
+  // ready, which is a fetch and a canvas encode later. A snapshot taken without waiting catches
+  // the intermediate value on a slow run and reports a marker that is not the final one.
+  try {
+    await page.waitForFunction(
+      () =>
+        document.body.dataset.idshMobile === undefined ||
+        document.body.dataset.idshMobile.includes('icon:'),
+      { timeout: WAIT_FOR_SETTLE_MS },
+    )
+  } catch {
+    // It never settled: a plugin that could not reach its last stage. The snapshot below reports
+    // what is there, and --scenario mobile is where that becomes an assertion.
+  }
+
   const facts = await page.evaluate(() => ({
     title: document.title,
     bodyLength: document.body.innerHTML.length,
