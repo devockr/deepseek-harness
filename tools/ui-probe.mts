@@ -98,8 +98,6 @@ const INSTALLS = values('--install')
  * saw the shipped template could not find a bug in those plugins, which is the tool's purpose, so
  * this set is installed by default; `--install` follows it and replaces any package it names.
  */
-const BAKED_MANIFEST = '/opt/dsh/home/.dsh/profiles/web/package.json'
-const BAKED_DIR = path.dirname(BAKED_MANIFEST)
 const BARE = flag('--bare')
 const KEEP = flag('--keep')
 const SHOT = values('--shot')[0] ?? 'probe'
@@ -186,61 +184,44 @@ const run = (
     )
   })
 
-/** The local-spec prefix of a dependency spec, or an empty string for anything else. */
-const localPrefix = (spec: string): string =>
-  ['link:', 'file:'].find(prefix => spec.startsWith(prefix)) ?? ''
-
-/** Read the baked manifest, and say why it could not be read when the reason is not "absent". */
-async function bakedManifest(): Promise<{
-  dependencies?: Record<string, string>
-  unreadable?: string
-}> {
+/**
+ * The plugin sources the image baked, by the same rule Dockerfile.dev bakes them: every directory
+ * under /opt/dsh/packages whose manifest declares a `dsh` field. That directory is world-readable
+ * on purpose, so this needs nothing the image does not already publish.
+ */
+async function bakedSpecs(): Promise<string[]> {
+  const root = '/opt/dsh/packages'
+  let dirs: string[]
   try {
-    const parsed = JSON.parse(await fs.readFile(BAKED_MANIFEST, 'utf8')) as {
-      dependencies?: Record<string, string>
-    }
-    return { dependencies: parsed.dependencies }
-  } catch (error) {
-    // Absent means this is simply not an image; anything else is a broken setup, and probing
-    // without the plugins it lists is the failure this default exists to remove.
-    if ((error as { code?: string }).code !== 'ENOENT') {
-      return {
-        unreadable: error instanceof Error ? error.message : String(error),
+    dirs = await fs.readdir(root)
+  } catch {
+    // Not the image that baked them; there is nothing to inherit.
+    return []
+  }
+  const specs: string[] = []
+  for (const dir of dirs) {
+    try {
+      const parsed = JSON.parse(
+        await fs.readFile(path.join(root, dir, 'package.json'), 'utf8'),
+      ) as { dsh?: unknown }
+      if (parsed.dsh) {
+        specs.push(`link:${path.join(root, dir)}`)
       }
+    } catch {
+      // A directory without a readable manifest is not a dsh plugin.
     }
-    return {}
   }
+  return specs
 }
 
-/** The plugin specs the image baked, as pnpm specs, plus why none could be read if that happened. */
-async function bakedSpecs(): Promise<{ specs: string[]; unreadable?: string }> {
-  const { dependencies, unreadable } = await bakedManifest()
-  if (!dependencies) {
-    return { specs: [], unreadable }
-  }
-  const specs = Object.entries(dependencies).map(([name, spec]) => {
-    const local = localPrefix(spec)
-    if (local) {
-      // pnpm may write these relative to the manifest that carries them, which is why
-      // sync-companions.mts resolves them from there; an absolute one is left unchanged.
-      return `${local}${path.resolve(BAKED_DIR, spec.slice(local.length))}`
-    }
-    return spec.startsWith('workspace:') ? spec : `${name}@${spec}`
-  })
-  return { specs, unreadable }
-}
-
-/** Report which plugin set is in play, and why none could be read when that happened. */
-function reportBaked(inherited: { specs: string[]; unreadable?: string }) {
+/** Say which set is in play: a silent default that installed nothing reads as success. */
+function reportBaked(inherited: string[]) {
   const found =
-    inherited.specs.length > 0
-      ? `${inherited.specs.length} to install`
-      : 'none found'
-  const why = inherited.unreadable ? ` — ${inherited.unreadable}` : ''
-  process.stdout.write(`image plugin set: ${found}${why}\n`)
-  if (inherited.unreadable) {
+    inherited.length > 0 ? `${inherited.length} to install` : 'none found'
+  process.stdout.write(`image plugin set: ${found}\n`)
+  if (inherited.length === 0) {
     process.stderr.write(
-      `probe: could not read the image's plugin set: ${inherited.unreadable}\n`,
+      'probe: no plugin sources under /opt/dsh/packages; name them with --install\n',
     )
   }
 }
@@ -271,12 +252,12 @@ async function prepareProfile() {
   }
   // Say which set is in play: a silent default that installed nothing looked exactly like a
   // successful run that found no plugin problems.
-  const inherited = BARE ? { specs: [] as string[] } : await bakedSpecs()
+  const inherited = BARE ? [] : await bakedSpecs()
   if (!BARE) {
     reportBaked(inherited)
   }
   const specs: Array<[string, string]> = [
-    ...inherited.specs.map((spec): [string, string] => [spec, 'image']),
+    ...inherited.map((spec): [string, string] => [spec, 'image']),
     ...INSTALLS.map((spec): [string, string] => [spec, '--install']),
   ]
   for (const [spec, source] of specs) {
