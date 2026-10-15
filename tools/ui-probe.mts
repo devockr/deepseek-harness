@@ -809,6 +809,7 @@ try {
       `visible text: ${facts.text}`,
       `screenshot  : ${shot}`,
       `problems    : ${problems.length > 0 ? '\n  ' + problems.join('\n  ') : 'none'}`,
+      `failures    : ${failures.length > 0 ? '\n  ' + failures.join('\n  ') : 'none'}`,
       `console log : ${console_all.length > 0 ? '\n  ' + console_all.slice(-LOG_TAIL_LINES).join('\n  ') : 'none'}`,
     ].join('\n') + '\n',
   )
