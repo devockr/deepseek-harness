@@ -175,6 +175,7 @@ else
     for addr in $(hostname -i 2> /dev/null); do
       case "$addr" in
         ::1 | 127.*) continue ;;
+        *%*) continue ;;
         *:*) bind_host="${bind_host:-$addr}" ;;
         *)
           bind_host="$addr"
@@ -189,7 +190,6 @@ else
     echo "entrypoint: binding $bind_host (this container; addresses: $(hostname -i 2> /dev/null))" >&2
   fi
   set -- "$@" --host "$bind_host"
-  echo "entrypoint: dsh prints its own 127.0.0.1 URL; in this netns use http://$bind_host:3080/, and the published port outside" >&2
 fi
 # The profile the image baked goes to a deployment that has none. An existing one keeps the packages
 # the image declares: anything missing, broken or behind the image's version is put in place as the
