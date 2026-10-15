@@ -546,14 +546,15 @@ try {
   // guessed.
   await page.waitForTimeout(WAIT_AFTER_LOAD_MS)
 
-  // `mark()` writes the mobile marker twice: the CSS half first, the icon once the artwork is
-  // ready, which is a fetch and a canvas encode later. A snapshot taken without waiting catches
-  // the intermediate value on a slow run and reports a marker that is not the final one.
+  // `mark()` writes the marker twice: the CSS half first, the icon once the artwork is ready, which
+  // is a fetch and a canvas encode later. An absent marker is not a settled one either — the plugin
+  // writes after activation, which can be later than this point — so this waits for the icon either
+  // way and only the timeout ends it; --scenario mobile is what fails the run when it never comes.
   try {
     await page.waitForFunction(
-      () =>
-        document.body.dataset.idshMobile === undefined ||
-        document.body.dataset.idshMobile.includes('icon:'),
+      (stage: string) =>
+        document.body.dataset.idshMobile?.includes(stage) ?? false,
+      'icon:',
       { timeout: WAIT_FOR_SETTLE_MS },
     )
   } catch {
