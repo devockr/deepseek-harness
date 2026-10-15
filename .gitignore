@@ -16,3 +16,6 @@ id_rsa
 id_ed25519
 # build output of the packages (the images ship lib/, the repo does not)
 packages/*/lib/
+
+# eslint --cache output
+.eslintcache

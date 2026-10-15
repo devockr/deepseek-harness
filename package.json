@@ -14,7 +14,7 @@
     "dev": "pnpm build && docker build --target base -t deepseek-harness-dsh:base . && docker build -f Dockerfile.dev -t deepseek-harness-dsh:dev .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "eslint .",
+    "lint": "eslint . --cache",
     "pack": "pnpm --recursive pack",
     "publish": "pnpm --recursive publish --access public",
     "typecheck": "tsc -p tsconfig.json"

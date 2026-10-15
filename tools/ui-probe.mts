@@ -10,9 +10,13 @@
  * not re-download it.
  *
  * Usage:
- *   node tools/ui-probe.mts [--install <pnpm-spec>]... [--host <host>] [--keep] [--shot <name>]
+ *   node tools/ui-probe.mts [--install <pnpm-spec>]... [--bare] [--host <host>] [--keep] [--shot <name>]
  *
- * --install     add a package to the probe profile before booting (repeatable)
+ * --install     add a package to the probe profile before booting (repeatable); a spec whose
+ *               package is already there replaces it
+ * --bare        start from the shipped web template alone, without the plugin set the image
+ *               baked. The default inherits that set, since finding bugs in those plugins is
+ *               what this tool is for; --bare narrows down which one is at fault
  * --host        the authority to browse, default 127.0.0.1; pass a LAN address to
  *               reproduce what a remote page sees
  * --keep        leave the probe instance and its $DSH_HOME behind for poking
@@ -89,6 +93,13 @@ const SHOTS = process.env.PROBE_SHOTS ?? '/home/app/.dsh/cache/ui-probe'
 const PROFILE = process.env.PROBE_PROFILE ?? 'probe'
 const HOST = values('--host')[0] ?? '127.0.0.1'
 const INSTALLS = values('--install')
+/**
+ * The plugin set the image baked, which is exactly what a deployment gets. A probe that only ever
+ * saw the shipped template could not find a bug in those plugins, which is the tool's purpose, so
+ * this set is installed by default; `--install` follows it and replaces any package it names.
+ */
+const BAKED_MANIFEST = '/opt/dsh/home/.dsh/profiles/web/package.json'
+const BARE = flag('--bare')
 const KEEP = flag('--keep')
 const SHOT = values('--shot')[0] ?? 'probe'
 const SCENARIO = values('--scenario')[0]
@@ -174,6 +185,29 @@ const run = (
     )
   })
 
+/** The plugin specs the image baked, as pnpm specs, or none when this is not running in one. */
+async function bakedSpecs(): Promise<string[]> {
+  let manifest: { dependencies?: Record<string, string> } | undefined
+  try {
+    manifest = JSON.parse(await fs.readFile(BAKED_MANIFEST, 'utf8')) as {
+      dependencies?: Record<string, string>
+    }
+  } catch {
+    // Not an image, or the manifest is unreadable: there is nothing to inherit.
+  }
+  const dependencies = manifest?.dependencies
+  if (!dependencies) {
+    return []
+  }
+  return Object.entries(dependencies).map(([name, spec]) =>
+    spec.startsWith('link:') ||
+    spec.startsWith('file:') ||
+    spec.startsWith('workspace:')
+      ? spec
+      : `${name}@${spec}`,
+  )
+}
+
 /** The probe profile: created from the shipped web template, never the live one. */
 async function prepareProfile() {
   await fs.mkdir(HOME, { recursive: true })
@@ -198,15 +232,29 @@ async function prepareProfile() {
       )
     }
   }
-  for (const spec of INSTALLS) {
+  // Say which set is in play: a silent default that installed nothing looked exactly like a
+  // successful run that found no plugin problems.
+  const inherited = BARE ? [] : await bakedSpecs()
+  if (!BARE) {
+    const found =
+      inherited.length > 0 ? `${inherited.length} to install` : 'none found'
+    process.stdout.write(`image plugin set: ${found}\n`)
+  }
+  const specs: Array<[string, string]> = [
+    ...inherited.map((spec): [string, string] => [spec, 'image']),
+    ...INSTALLS.map((spec): [string, string] => [spec, '--install']),
+  ]
+  for (const [spec, source] of specs) {
     const r = await run(['plugin', '--profile', PROFILE, 'add', spec])
     process.stdout.write(
-      `install ${spec}: ${r.status === 0 ? 'ok' : 'FAILED'}\n`,
+      `install (${source}) ${spec}: ${r.status === 0 ? 'ok' : 'FAILED'}\n`,
     )
     if (r.status !== 0) {
-      // Booting anyway would probe a profile without the plugin the caller asked for, and still
-      // exit 0 — fail here, where the message means something.
-      throw new Error(`could not install ${spec}:\n${r.stdout}${r.stderr}`)
+      // Booting anyway would probe a profile without the plugin that was asked for — the baked
+      // set or the caller's — and still exit 0. Fail here, where the message means something.
+      throw new Error(
+        `could not install ${spec} (from ${source}):\n${r.stdout}${r.stderr}`,
+      )
     }
   }
 }
