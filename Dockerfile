@@ -53,6 +53,11 @@ RUN --mount=type=cache,id=apt_cache,target=/var/cache/apt,sharing=locked \
 # pnpm is in the same install because the plugin manager drives it and has no npm
 # fallback, and because it must resolve from the image's PATH: the in-app installer
 # spawns it with a scrubbed environment, so a user-prefix install is invisible.
+# The mirror is an argument, and an ARG is scoped to the stage that declares it. Without this
+# declaration the RUN below expands it to nothing — which silently sent this install to the default
+# registry instead of the mirror, and is why a base build here was slow.
+ARG NPM_REGISTRY=https://registry.npmmirror.com/
+
 RUN --mount=type=cache,id=npm_cache,target=/root/.npm \
   npm install -g --registry="$NPM_REGISTRY" @deepseek-ai/dsh@0.2.1-alpha.3 pnpm@12.11.2
 
