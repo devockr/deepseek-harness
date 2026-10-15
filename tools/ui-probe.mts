@@ -99,6 +99,7 @@ const INSTALLS = values('--install')
  * this set is installed by default; `--install` follows it and replaces any package it names.
  */
 const BAKED_MANIFEST = '/opt/dsh/home/.dsh/profiles/web/package.json'
+const BAKED_DIR = path.dirname(BAKED_MANIFEST)
 const BARE = flag('--bare')
 const KEEP = flag('--keep')
 const SHOT = values('--shot')[0] ?? 'probe'
@@ -199,13 +200,16 @@ async function bakedSpecs(): Promise<string[]> {
   if (!dependencies) {
     return []
   }
-  return Object.entries(dependencies).map(([name, spec]) =>
-    spec.startsWith('link:') ||
-    spec.startsWith('file:') ||
-    spec.startsWith('workspace:')
-      ? spec
-      : `${name}@${spec}`,
-  )
+  return Object.entries(dependencies).map(([name, spec]) => {
+    for (const local of ['link:', 'file:']) {
+      if (spec.startsWith(local)) {
+        // pnpm may write these relative to the manifest that carries them, which is why
+        // sync-companions.mts resolves them from there; an absolute one is left as it is.
+        return `${local}${path.resolve(BAKED_DIR, spec.slice(local.length))}`
+      }
+    }
+    return spec.startsWith('workspace:') ? spec : `${name}@${spec}`
+  })
 }
 
 /** The probe profile: created from the shipped web template, never the live one. */
