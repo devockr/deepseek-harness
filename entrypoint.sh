@@ -218,7 +218,7 @@ if [ ! -d "$profile" ] && [ -d /opt/dsh/home/.dsh/profiles/web ]; then
 elif [ -d "$profile" ] && [ ! -f "$profile/package.json" ]; then
   # Half-initialised: fill it in place, or the copy above would nest itself one level down.
   cp -a /opt/dsh/home/.dsh/profiles/web/. "$profile/"
-  chown -R "$PUID:$PGID" "$profile"
+  repair_profile "$profile"
 elif [ -d /opt/dsh/home/.dsh/profiles/web/node_modules ]; then
   repair_profile "$HOME/.dsh/profiles/web"
 fi
