@@ -86,3 +86,10 @@ the document (`enterEvents: []`), both `contenteditable` spellings are sent
 `insertLineBreak` (`insertedBreaks`), the session-search input keeps its own Enter, and a
 regression on any of those lands in `problems` — checked by pointing the scenario at a build
 that still dispatches the old shift+Enter, where those three assertions fail.
+
+These packages declare dsh's own modules under `peerDependencies`, because they are only ever
+imported for types — the running dsh supplies them — and a peer range does not have to be bumped
+on every dsh release. The range is a disjunction for a reason worth keeping: npm only lets a
+prerelease satisfy a range that carries a prerelease on the _same_ `major.minor.patch`, so
+`^0.2.0-rc.2` alone matches `0.2.0-rc.2` but not `0.2.1-alpha.3`. `^0.2.0-rc.2 || ^0.2.1-alpha.3`
+is the shortest form that accepts both; extend it when a new dsh line appears.

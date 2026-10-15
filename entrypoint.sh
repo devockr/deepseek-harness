@@ -200,6 +200,11 @@ profile="$HOME/.dsh/profiles/web"
 if [ ! -d "$profile" ] && [ -d /opt/dsh/home/.dsh/profiles/web ]; then
   mkdir -p "$HOME/.dsh/profiles"
   cp -a /opt/dsh/home/.dsh/profiles/web "$HOME/.dsh/profiles/"
+  # The baked profile keeps its `link:` packages as symlinks written relative to /opt/dsh/home,
+  # which stop resolving once the profile lives here — dsh then skips those bundles entirely —
+  # so the same repair that runs for an existing profile runs for a fresh copy too.
+  node /opt/dsh/tools/sync-companions.mts \
+    || echo "entrypoint: could not repair the companion packages" >&2
   chown -R "$PUID:$PGID" "$profile"
 elif [ -d "$profile" ] && [ ! -f "$profile/package.json" ]; then
   # Half-initialised: fill it in place, or the copy above would nest itself one level down.

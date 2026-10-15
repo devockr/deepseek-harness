@@ -80,3 +80,10 @@ this package activated is beyond that repair, and the marker is what tells you s
   marker is `SELF-CHECK-FAILED`. A consumer that copied the value into its own state
   before this package activated is beyond any repair, and the marker is what says so;
   a profile with no gateway at all reports `host:undefined` and is not judged.
+
+These packages declare dsh's own modules under `peerDependencies`, because they are only ever
+imported for types — the running dsh supplies them — and a peer range does not have to be bumped
+on every dsh release. The range is a disjunction for a reason worth keeping: npm only lets a
+prerelease satisfy a range that carries a prerelease on the _same_ `major.minor.patch`, so
+`^0.2.0-rc.2` alone matches `0.2.0-rc.2` but not `0.2.1-alpha.3`. `^0.2.0-rc.2 || ^0.2.1-alpha.3`
+is the shortest form that accepts both; extend it when a new dsh line appears.
