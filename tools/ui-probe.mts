@@ -495,6 +495,27 @@ const PHONE = { hasTouch: true, viewport: { width: 390, height: 844 } }
 const page = await browser.newPage(
   SCENARIO === 'mobile' ? PHONE : { viewport: { width: 1280, height: 900 } },
 )
+// A scenario assertion, as opposed to a problem worth reading: the run has to fail on it.
+const failures: string[] = []
+
+/** The marker's last stage is the icon: a run that stopped short is a failure, not a value. */
+function checkMobileMarker(probe: {
+  marker?: string
+  appleTouchIcon: boolean
+}): void {
+  const marker = probe.marker
+  if (!marker?.includes('icon:')) {
+    failures.push(
+      `the mobile marker never reached its icon stage: ${marker ?? '(absent)'}`,
+    )
+  } else if (!marker.endsWith('icon:ok')) {
+    failures.push(`the mobile marker stopped at ${marker}`)
+  }
+  if (!probe.appleTouchIcon) {
+    failures.push('no apple-touch-icon was injected')
+  }
+}
+
 const problems = []
 let completed = false
 // Everything, not just errors: cordis reports an unmet `inject` as a warning the
@@ -524,6 +545,21 @@ try {
   // moment, then describe what we actually got instead of asserting a selector we
   // guessed.
   await page.waitForTimeout(WAIT_AFTER_LOAD_MS)
+
+  // `mark()` writes the mobile marker twice: the CSS half first, the icon once the artwork is
+  // ready, which is a fetch and a canvas encode later. A snapshot taken without waiting catches
+  // the intermediate value on a slow run and reports a marker that is not the final one.
+  try {
+    await page.waitForFunction(
+      () =>
+        document.body.dataset.idshMobile === undefined ||
+        document.body.dataset.idshMobile.includes('icon:'),
+      { timeout: WAIT_FOR_SETTLE_MS },
+    )
+  } catch {
+    // It never settled: a plugin that could not reach its last stage. The snapshot below reports
+    // what is there, and --scenario mobile is where that becomes an assertion.
+  }
 
   // Scenarios exist because "the flag flipped" is not the same answer as "the
   // privileged surface behaves". Discovery first: click the entry and report the
@@ -757,23 +793,9 @@ try {
         `the session-search input lost its own Enter: ${JSON.stringify(probe.inputEvents)}`,
       )
     }
+    checkMobileMarker(probe)
     process.stdout.write(`mobile probe : ${JSON.stringify(probe)}\n`)
     await page.screenshot({ path: path.join(SHOTS, `${SHOT}-mobile.png`) })
-  }
-
-  // `mark()` writes the mobile marker twice: the CSS half first, the icon once the artwork is
-  // ready, which is a fetch and a canvas encode later. A snapshot taken without waiting catches
-  // the intermediate value on a slow run and reports a marker that is not the final one.
-  try {
-    await page.waitForFunction(
-      () =>
-        document.body.dataset.idshMobile === undefined ||
-        document.body.dataset.idshMobile.includes('icon:'),
-      { timeout: WAIT_FOR_SETTLE_MS },
-    )
-  } catch {
-    // It never settled: a plugin that could not reach its last stage. The snapshot below reports
-    // what is there, and --scenario mobile is where that becomes an assertion.
   }
 
   const facts = await page.evaluate(() => ({
@@ -803,6 +825,9 @@ try {
   completed = true
 } finally {
   await browser.close()
+  // Set before the branch: without --keep the process simply ends, and the exit code has to
+  // say the same thing it says when the instance is left behind.
+  process.exitCode = completed && failures.length === 0 ? 0 : 1
   if (KEEP) {
     // Printing and returning leaves the piped server attached to this process, so the probe would
     // never give the shell back: unref the child and end on purpose, leaving it running. `else`, not
@@ -811,7 +836,6 @@ try {
       `kept: ${HOME} (pid ${child?.pid})\n${out.slice(-OUTPUT_TAIL_CHARS)}\n`,
     )
     child?.unref()
-    process.exitCode = completed ? 0 : 1
   } else {
     child?.kill('SIGTERM')
   }
