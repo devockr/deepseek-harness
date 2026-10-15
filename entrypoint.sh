@@ -131,14 +131,8 @@ done
 CRED="$HOME/.dsh/.credentials.yaml"
 [ -f "$CRED" ] && chmod 600 "$CRED"
 
-# Reachability — binding an address another machine can reach — used to be @idsh/remote-access's
-# whole job: the older dsh refused `--host 0.0.0.0` on the command line and nowhere else, so a
-# config layer was the only way to ask. The newer dsh validates the bind address wherever it
-# comes from and refuses the wildcard outright, so a config layer is no longer a way around it.
-# The entrypoint therefore names one concrete address itself (below), while the package stays in
-# the profile for the rest of what it does — its `!!js` fallbacks keep `--host` and `--port`
-# winning. With the package absent — a profile that never had it, or one where it was removed —
-# dsh keeps its shipped loopback bind.
+# @idsh/remote-access describes the reachability rules in its own README; with it absent — a
+# profile that never had it, or one where it was removed — dsh keeps its shipped loopback bind.
 
 # The browser-trust fence rejects API requests whose Host is not loopback or a
 # trusted host. DSH_TRUSTED_HOSTS is a space-separated list of authorities
@@ -149,14 +143,13 @@ for h in ${DSH_TRUSTED_HOSTS:-}; do
   set -- "$@" --trusted-host "$h"
 done
 
-# Which address dsh should bind. The newer releases refuse the wildcard, and they validate whatever
-# they are given — dsh owns that check, since it parses IP literals properly and rejects every wildcard
-# spelling. The entrypoint only decides which address to offer: DSH_BIND_HOST when set, otherwise this
-# container's own, which is where Docker's published port forwards. A container where neither can be
-# worked out stops here, because dsh's shipped bind answers on loopback, and loopback is not a
-# deployment reached from another machine.
-# An explicit --host from the caller wins: adding ours would be parsed last and replace it, and a
-# caller may well be opting back into loopback on purpose (packages/remote-access/README.md says so).
+# Which address dsh should bind. Reachability used to come from @idsh/remote-access's config layer,
+# which only worked while dsh checked the command line alone; the newer releases validate the value
+# wherever it comes from and refuse the wildcard, and dsh owns that check. So the entrypoint decides
+# only which address to offer — DSH_BIND_HOST when set, otherwise this container's own, which is
+# where a published port forwards — and stops if it has none, since dsh would answer on loopback.
+# An explicit --host from the caller wins: appending ours would be parsed last and replace it, and a
+# caller may be opting back into loopback on purpose (packages/remote-access/README.md says so).
 explicit_host=
 for arg in "$@"; do
   case "$arg" in
@@ -170,9 +163,11 @@ else
   if [ -n "$bind_host" ]; then
     echo "entrypoint: binding $bind_host (DSH_BIND_HOST)" >&2
   else
-    # One pass: an IPv4 address wins outright, an IPv6 one is kept only as a fallback, and the
-    # addresses are listed with the choice so a multi-network container is not a silent guess.
-    for addr in $(hostname -i 2> /dev/null); do
+    # One pass: an IPv4 address wins outright and an IPv6 one is kept only as a fallback; an
+    # address carrying an interface zone id is skipped, since no URL can express one. All of
+    # them are listed with the choice, so a multi-network container is not a silent guess.
+    addresses=$(hostname -i 2> /dev/null)
+    for addr in $addresses; do
       case "$addr" in
         ::1 | 127.*) continue ;;
         *%*) continue ;;
@@ -187,9 +182,14 @@ else
       echo "entrypoint: no bind address found; set DSH_BIND_HOST. dsh's default answers on loopback only." >&2
       exit 1
     fi
-    echo "entrypoint: binding $bind_host (this container; addresses: $(hostname -i 2> /dev/null))" >&2
+    echo "entrypoint: binding $bind_host (this container; addresses: $addresses)" >&2
   fi
   set -- "$@" --host "$bind_host"
+fi
+
+# Advertise the root a reverse proxy fronts (--public-url); no-op when unset.
+if [ -n "${DSH_PUBLIC_URL:-}" ]; then
+  set -- "$@" --public-url "$DSH_PUBLIC_URL"
 fi
 # The profile the image baked goes to a deployment that has none. An existing one keeps the packages
 # the image declares: anything missing, broken or behind the image's version is put in place as the
@@ -212,11 +212,6 @@ elif [ -d /opt/dsh/home/.dsh/profiles/web/node_modules ]; then
     || echo "entrypoint: could not repair the companion packages" >&2
   chown -R "$PUID:$PGID" "$HOME/.dsh/profiles/web" \
     || echo "entrypoint: could not fix the profile ownership" >&2
-fi
-
-# Advertise the reverse-proxy root (alpha --public-url); no-op if unset.
-if [ -n "${DSH_PUBLIC_URL:-}" ]; then
-  set -- "$@" --public-url "$DSH_PUBLIC_URL"
 fi
 
 # Drop privileges before exec: dsh and everything it spawns must run as the host

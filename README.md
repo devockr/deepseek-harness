@@ -40,10 +40,7 @@ Dockerized [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (
    ```sh
    docker compose logs dsh
    # dsh web: http://<the address it bound>:3080/?token=...
-   #   The authority is the address the entrypoint bound — the container's own, unless the
-   #   deployment passed `--host` or set `DSH_BIND_HOST`; `--public-url` replaces it when set.
-   #   It is `127.0.0.1` only when loopback was asked for, and a deployment with no bind
-   #   address to offer stops instead, so that line never shows a loopback default by accident.
+   #   that address, not 127.0.0.1, is what to open; `--public-url` replaces it when set
    ```
 
 4. Open it in your browser (note the host port is `15080`):
@@ -71,14 +68,14 @@ The token rotates on every restart.
 
 Environment variables (see `docker-compose.example.yml`):
 
-| Variable                                                | Purpose                                                                                                                                                             | Default                           |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| `PUID` / `PGID`                                         | uid/gid dsh runs as (and owns bind-mounted files as); compose forwards the host's `$UID`/`$GID`                                                                     | `$UID` / `$GID`                   |
-| `NPM_REGISTRY`                                          | npm/pnpm/yarn registry: the image build and the user-level configs use it                                                                                           | `https://registry.npmmirror.com/` |
-| `DSH_TRUSTED_HOSTS`                                     | Space-separated host authorities allowed by dsh's browser-trust fence                                                                                               | `dsh.example.com`                 |
-| `DSH_PUBLIC_URL`                                        | Public HTTP(S) root to advertise behind a prefix-stripping proxy; pair it with `DSH_TRUSTED_HOSTS`                                                                  | —                                 |
-| `DSH_BIND_HOST`                                         | Concrete address dsh binds — the wildcard is refused, so it defaults to the container's own; set `127.0.0.1` to keep in-container loopback and give up remote reach | this container                    |
-| `http_proxy` / `https_proxy` / `all_proxy` / `no_proxy` | Outbound proxy for dsh's HTTP requests                                                                                                                              | —                                 |
+| Variable                                                | Purpose                                                                                                                                                                                                    | Default                           |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| `PUID` / `PGID`                                         | uid/gid dsh runs as (and owns bind-mounted files as); compose forwards the host's `$UID`/`$GID`                                                                                                            | `$UID` / `$GID`                   |
+| `NPM_REGISTRY`                                          | npm/pnpm/yarn registry: the image build and the user-level configs use it                                                                                                                                  | `https://registry.npmmirror.com/` |
+| `DSH_TRUSTED_HOSTS`                                     | Space-separated host authorities allowed by dsh's browser-trust fence                                                                                                                                      | `dsh.example.com`                 |
+| `DSH_PUBLIC_URL`                                        | Public HTTP(S) root to advertise behind a prefix-stripping proxy; pair it with `DSH_TRUSTED_HOSTS`                                                                                                         | —                                 |
+| `DSH_BIND_HOST`                                         | Concrete address dsh binds, defaulting to the container's own (the wildcard is refused): set it to `127.0.0.1` to give up remote reach, or to one address when several networks make the default ambiguous | this container                    |
+| `http_proxy` / `https_proxy` / `all_proxy` / `no_proxy` | Outbound proxy for dsh's HTTP requests                                                                                                                                                                     | —                                 |
 
 At boot the registry is written into `~/.npmrc`, `~/.yarnrc` and `~/.yarnrc.yml` (corepack
 and node-gyp mirrors follow), not into the environment — so a project that pins its own
