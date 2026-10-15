@@ -104,6 +104,11 @@ would only be saying something about the harness.
 | `0.2.1-alpha.3` | boots           | passes the probe, markers included        |
 | `0.2.1-alpha.4` | boots           | passes the probe, markers included        |
 
+The two failures have one cause, and dsh names it: loading [`@idsh/remote-access`](../remote-access/)
+prints `patch: entry "webserver" not found`, because its `cordis.patch.yml` targets the `webserver` and
+`typert-gateway` rows of `@deepseek-ai/dsh-base` and those rows only join that graph at `0.2.1-alpha.3`.
+The patch has nowhere to land before it, and the instance never reaches its readiness line.
+
 So neither floor can move down: `rc.2` is the first working version of its line and `alpha.3` of
-its. `0.1.x` is not claimed at all — it predates the `0.2` surface these packages are built
+its, and both are where the graph these packages patch first exists. `0.1.x` is not claimed at all — it predates the `0.2` surface these packages are built
 against, and dsh refuses the install there on the strength of this same range.
