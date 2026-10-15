@@ -155,29 +155,41 @@ done
 # container's own, which is where Docker's published port forwards. A container where neither can be
 # worked out stops here, because dsh's shipped bind answers on loopback, and loopback is not a
 # deployment reached from another machine.
-bind_host="${DSH_BIND_HOST:-}"
-if [ -n "$bind_host" ]; then
-  echo "entrypoint: binding $bind_host (DSH_BIND_HOST)" >&2
+# An explicit --host from the caller wins: adding ours would be parsed last and replace it, and a
+# caller may well be opting back into loopback on purpose (packages/remote-access/README.md says so).
+explicit_host=
+for arg in "$@"; do
+  case "$arg" in
+    --host | --host=*) explicit_host=1 ;;
+  esac
+done
+if [ -n "$explicit_host" ]; then
+  echo "entrypoint: --host was passed in; leaving the bind address to it" >&2
 else
-  # One pass: an IPv4 address wins outright, an IPv6 one is kept only as a fallback, and the
-  # addresses are listed with the choice so a multi-network container is not a silent guess.
-  for addr in $(hostname -i 2> /dev/null); do
-    case "$addr" in
-      ::1 | 127.*) continue ;;
-      *:*) bind_host="${bind_host:-$addr}" ;;
-      *)
-        bind_host="$addr"
-        break
-        ;;
-    esac
-  done
-  if [ -z "$bind_host" ]; then
-    echo "entrypoint: no bind address found; set DSH_BIND_HOST. dsh's default answers on loopback only." >&2
-    exit 1
+  bind_host="${DSH_BIND_HOST:-}"
+  if [ -n "$bind_host" ]; then
+    echo "entrypoint: binding $bind_host (DSH_BIND_HOST)" >&2
+  else
+    # One pass: an IPv4 address wins outright, an IPv6 one is kept only as a fallback, and the
+    # addresses are listed with the choice so a multi-network container is not a silent guess.
+    for addr in $(hostname -i 2> /dev/null); do
+      case "$addr" in
+        ::1 | 127.*) continue ;;
+        *:*) bind_host="${bind_host:-$addr}" ;;
+        *)
+          bind_host="$addr"
+          break
+          ;;
+      esac
+    done
+    if [ -z "$bind_host" ]; then
+      echo "entrypoint: no bind address found; set DSH_BIND_HOST. dsh's default answers on loopback only." >&2
+      exit 1
+    fi
+    echo "entrypoint: binding $bind_host (this container; addresses: $(hostname -i 2> /dev/null))" >&2
   fi
-  echo "entrypoint: binding $bind_host (this container; addresses: $(hostname -i 2> /dev/null))" >&2
+  set -- "$@" --host "$bind_host"
 fi
-set -- "$@" --host "$bind_host"
 # The profile the image baked goes to a deployment that has none. An existing one keeps the packages
 # the image declares: anything missing, broken or behind the image's version is put in place as the
 # image installed it, and anything at that version or above — a pin, a fork, a link into a mounted

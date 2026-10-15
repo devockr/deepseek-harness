@@ -232,7 +232,7 @@ async function boot() {
         '- id: webserver',
         "  name: '@deepseek-ai/dsh-host-webserver'",
         '  config:',
-        "    host: '0.0.0.0'",
+        "    host: '127.0.0.1',"
         '    port: !!js ctx.webStartup.port ?? 3080',
         '    compression: gzip',
         '    compressionLevel: 1',
