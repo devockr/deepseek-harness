@@ -39,8 +39,11 @@ Dockerized [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (
 
    ```sh
    docker compose logs dsh
-   # dsh web: http://127.0.0.1:3080/?token=...
-   #   (the authority is the bind the entrypoint chose; `--public-url` replaces it when set)
+   # dsh web: http://<the address it bound>:3080/?token=...
+   #   The authority is the address the entrypoint bound — the container's own, unless the
+   #   deployment passed `--host` or set `DSH_BIND_HOST`; `--public-url` replaces it when set.
+   #   It is `127.0.0.1` only when loopback was asked for, and a deployment with no bind
+   #   address to offer stops instead, so that line never shows a loopback default by accident.
    ```
 
 4. Open it in your browser (note the host port is `15080`):

@@ -131,14 +131,14 @@ done
 CRED="$HOME/.dsh/.credentials.yaml"
 [ -f "$CRED" ] && chmod 600 "$CRED"
 
-# Binding every interface — what makes the Web UI reachable from another machine — is
-# done by @idsh/remote-access, not here. dsh refuses `--host 0.0.0.0` on the command line
-# on purpose, so a config layer is the only way to ask, and the package is that layer:
-# installed into the profile below, it lands under any `--patch` or profile patch, and its
-# `!!js` fallbacks keep `--host` and `--port` winning. This image used to carry its own
-# overlay for it, which shadowed the package and had to be kept in sync; with the package
-# absent — a profile that never had it, or one where it was removed — the server keeps
-# dsh's shipped loopback bind.
+# Reachability — binding an address another machine can reach — used to be @idsh/remote-access's
+# whole job: the older dsh refused `--host 0.0.0.0` on the command line and nowhere else, so a
+# config layer was the only way to ask. The newer dsh validates the bind address wherever it
+# comes from and refuses the wildcard outright, so a config layer is no longer a way around it.
+# The entrypoint therefore names one concrete address itself (below), while the package stays in
+# the profile for the rest of what it does — its `!!js` fallbacks keep `--host` and `--port`
+# winning. With the package absent — a profile that never had it, or one where it was removed —
+# dsh keeps its shipped loopback bind.
 
 # The browser-trust fence rejects API requests whose Host is not loopback or a
 # trusted host. DSH_TRUSTED_HOSTS is a space-separated list of authorities
