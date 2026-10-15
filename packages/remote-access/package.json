@@ -1,6 +1,6 @@
 {
   "name": "@idsh/remote-access",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "type": "module",
   "description": "Reach a dsh Web profile from another machine: bind every interface and keep the UI's Remote-mux WebSocket alive across a flaky or proxied link",
   "repository": {
