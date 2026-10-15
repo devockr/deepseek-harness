@@ -93,4 +93,5 @@ RUN mkdir -p /opt/dsh/home \
   && printf 'registry=%s\n' "$NPM_REGISTRY" > "$HOME/.npmrc" \
   && dsh web --dump-config > /dev/null \
   && dsh plugin --profile web add @idsh/remote-access@0.1.0 \
+  && dsh plugin --profile web add @idsh/privileged-ui@0.1.0 \
   && test -f /opt/dsh/home/.dsh/profiles/web/package.json
