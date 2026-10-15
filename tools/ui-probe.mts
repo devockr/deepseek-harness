@@ -214,10 +214,10 @@ async function prepareProfile() {
 /**
  * Boot the instance, wait for the readiness line, return { url, token, child }.
  *
- * Browsing a non-loopback authority is what reproduces a remote page, and that needs
- * the server to bind one — `dsh web --host 0.0.0.0` is refused by design, so the bind
- * goes in as a patch overlay (the same way a deployment does it). The `!!js` port
- * fallback keeps `--port 0` working.
+ * Browsing a non-loopback authority is what reproduces a remote page, and that needs the
+ * server to bind one — the shipped bind is loopback and the wildcard is refused outright,
+ * so the authority itself goes in as a patch overlay (the same way a deployment does it).
+ * The `!!js` port fallback keeps `--port 0` working.
  */
 async function boot() {
   // Launcher options have to precede the app's: the launcher hands everything from
@@ -225,14 +225,14 @@ async function boot() {
   // `--port`.
   const args = ['--profile', PROFILE]
   if (!isLoopback(HOST)) {
-    const patch = path.join(HOME, 'bind-all-interfaces.patch.yml')
+    const patch = path.join(HOME, 'bind-authority.patch.yml')
     await fs.writeFile(
       patch,
       [
         '- id: webserver',
         "  name: '@deepseek-ai/dsh-host-webserver'",
         '  config:',
-        "    host: '0.0.0.0'",
+        `    host: ${HOST},`,
         '    port: !!js ctx.webStartup.port ?? 3080',
         '    compression: gzip',
         '    compressionLevel: 1',
