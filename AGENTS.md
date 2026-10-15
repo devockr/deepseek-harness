@@ -162,8 +162,11 @@ Observe the running thing; do not reason from source.
 - An image's plugin set is the `dsh plugin add` line its Dockerfile bakes with: registry versions in
   `Dockerfile`, `link:` copies from `packages/` in `Dockerfile.dev`. The second custom manager in
   `renovate.json` keeps those versions current.
-- No `dependencies`/`peerDependencies` on purpose: a declared peer makes pnpm's
-  `autoInstallPeers` pull `@deepseek-ai/dsh-*` into the profile.
+- No `dependencies`. `@deepseek-ai/dsh-*` appear as `peerDependencies`, which says which dsh line a
+  plugin is built against without pinning one into the profile: `dsh plugin --profile web add` on a
+  peers-only manifest installs the plugin alone (`Packages: +1`) and only warns that the peers are
+  unmet, so nothing of dsh's lands in the profile. A `devDependency` pin instead fights the version
+  the container actually runs.
 - New workspace package → `pnpm install --force`, and drop `node_modules/.pnpm/lock.yaml` plus
   `.pnpm-workspace-state-v1.json` if the importer is skipped.
 
