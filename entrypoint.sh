@@ -197,37 +197,30 @@ fi
 # checkout — is left alone. No boot downloads anything. Disabling is dropping a package from the
 # bundle list, not uninstalling it; nothing is ever removed, and nothing here names a package.
 profile="$HOME/.dsh/profiles/web"
+# The baked profile keeps its `link:` packages as symlinks written relative to /opt/dsh/home, which
+# stop resolving once the profile lives under $HOME — dsh then skips those bundles entirely — so the
+# same repair runs here. Ownership is fixed before stopping: the script replaces packages one at a
+# time as root, so a failure halfway through would otherwise leave the ones already swapped
+# root-owned in the host bind mount, which is what the chown after it is for.
+repair_profile() {
+  if ! node /opt/dsh/tools/sync-companions.mts; then
+    echo "entrypoint: could not repair the companion packages" >&2
+    chown -R "$PUID:$PGID" "$1" || echo "entrypoint: could not fix the profile ownership" >&2
+    exit 1
+  fi
+  chown -R "$PUID:$PGID" "$1" || echo "entrypoint: could not fix the profile ownership" >&2
+}
+
 if [ ! -d "$profile" ] && [ -d /opt/dsh/home/.dsh/profiles/web ]; then
   mkdir -p "$HOME/.dsh/profiles"
   cp -a /opt/dsh/home/.dsh/profiles/web "$HOME/.dsh/profiles/"
-  # The baked profile keeps its `link:` packages as symlinks written relative to /opt/dsh/home,
-  # which stop resolving once the profile lives here — dsh then skips those bundles entirely —
-  # so the same repair that runs for an existing profile runs for a fresh copy too.
-  # Fix ownership before stopping: the script replaces packages one at a time as root, so a
-  # failure halfway through would otherwise leave the ones already swapped root-owned in the
-  # host bind mount — which is the case the chown below exists for.
-  if ! node /opt/dsh/tools/sync-companions.mts; then
-    echo "entrypoint: could not repair the companion packages" >&2
-    chown -R "$PUID:$PGID" "$profile" \
-      || echo "entrypoint: could not fix the profile ownership" >&2
-    exit 1
-  fi
-  chown -R "$PUID:$PGID" "$profile"
+  repair_profile "$profile"
 elif [ -d "$profile" ] && [ ! -f "$profile/package.json" ]; then
   # Half-initialised: fill it in place, or the copy above would nest itself one level down.
   cp -a /opt/dsh/home/.dsh/profiles/web/. "$profile/"
   chown -R "$PUID:$PGID" "$profile"
 elif [ -d /opt/dsh/home/.dsh/profiles/web/node_modules ]; then
-  # Ownership is fixed whatever the script did: it replaces packages one at a time as root, so a
-  # failure halfway through would otherwise leave the ones already swapped in root-owned.
-  if ! node /opt/dsh/tools/sync-companions.mts; then
-    echo "entrypoint: could not repair the companion packages" >&2
-    chown -R "$PUID:$PGID" "$HOME/.dsh/profiles/web" \
-      || echo "entrypoint: could not fix the profile ownership" >&2
-    exit 1
-  fi
-  chown -R "$PUID:$PGID" "$HOME/.dsh/profiles/web" \
-    || echo "entrypoint: could not fix the profile ownership" >&2
+  repair_profile "$HOME/.dsh/profiles/web"
 fi
 
 # Drop privileges before exec: dsh and everything it spawns must run as the host
