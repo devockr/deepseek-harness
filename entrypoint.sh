@@ -204,7 +204,10 @@ if [ ! -d "$profile" ] && [ -d /opt/dsh/home/.dsh/profiles/web ]; then
   # which stop resolving once the profile lives here — dsh then skips those bundles entirely —
   # so the same repair that runs for an existing profile runs for a fresh copy too.
   node /opt/dsh/tools/sync-companions.mts \
-    || { echo "entrypoint: could not repair the companion packages" >&2; exit 1; }
+    || {
+      echo "entrypoint: could not repair the companion packages" >&2
+      exit 1
+    }
   chown -R "$PUID:$PGID" "$profile"
 elif [ -d "$profile" ] && [ ! -f "$profile/package.json" ]; then
   # Half-initialised: fill it in place, or the copy above would nest itself one level down.
@@ -214,7 +217,10 @@ elif [ -d /opt/dsh/home/.dsh/profiles/web/node_modules ]; then
   # Ownership is fixed whatever the script did: it replaces packages one at a time as root, so a
   # failure halfway through would otherwise leave the ones already swapped in root-owned.
   node /opt/dsh/tools/sync-companions.mts \
-    || { echo "entrypoint: could not repair the companion packages" >&2; exit 1; }
+    || {
+      echo "entrypoint: could not repair the companion packages" >&2
+      exit 1
+    }
   chown -R "$PUID:$PGID" "$HOME/.dsh/profiles/web" \
     || echo "entrypoint: could not fix the profile ownership" >&2
 fi
