@@ -291,7 +291,9 @@ async function boot() {
     '--profile',
     PROFILE,
     '--host',
-    HOST,
+    // dsh takes one concrete IP literal, and `isLoopback` also accepts `localhost` and `[::1]`:
+    // normalise those to 127.0.0.1, the authority the printed URL uses anyway.
+    isLoopback(HOST) ? '127.0.0.1' : HOST,
     '--port',
     '0',
     '--no-open',

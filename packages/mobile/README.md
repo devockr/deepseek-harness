@@ -84,7 +84,7 @@ and a plain Enter still reaches the session-search input untouched.
 `node tools/ui-probe.mts --scenario mobile` asserts all of it: the plain Enter never reaches
 the document (`enterEvents: []`), both `contenteditable` spellings are sent
 `insertLineBreak` (`insertedBreaks`), the session-search input keeps its own Enter, and a
-regression on any of those lands in `problems` — checked by pointing the scenario at a build
+regression on any of those lands in `failures` — checked by pointing the scenario at a build
 that still dispatches the old shift+Enter, where those three assertions fail.
 
 dsh's own modules are declared under `peerDependencies` and never as dependencies, since the
