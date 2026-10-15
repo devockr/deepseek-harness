@@ -70,6 +70,7 @@ Environment variables (see `docker-compose.example.yml`):
 | `NPM_REGISTRY`                                          | npm/pnpm/yarn registry: the image build and the user-level configs use it                          | `https://registry.npmmirror.com/` |
 | `DSH_TRUSTED_HOSTS`                                     | Space-separated host authorities allowed by dsh's browser-trust fence                              | `dsh.example.com`                 |
 | `DSH_PUBLIC_URL`                                        | Public HTTP(S) root to advertise behind a prefix-stripping proxy; pair it with `DSH_TRUSTED_HOSTS` | —                                 |
+| `DSH_BIND_HOST`                                         | Concrete address dsh binds — the wildcard is refused, so it defaults to the container's own        | this container                    |
 | `http_proxy` / `https_proxy` / `all_proxy` / `no_proxy` | Outbound proxy for dsh's HTTP requests                                                             | —                                 |
 
 At boot the registry is written into `~/.npmrc`, `~/.yarnrc` and `~/.yarnrc.yml` (corepack

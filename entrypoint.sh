@@ -149,33 +149,60 @@ for h in ${DSH_TRUSTED_HOSTS:-}; do
   set -- "$@" --trusted-host "$h"
 done
 
-# dsh 0.2.1-alpha.3 refuses the wildcard bind address and accepts any concrete literal; @idsh/remote-access
-# used to supply "0.0.0.0" from a config layer, which only worked while the command line was checked.
-# DSH_BIND_HOST overrides the choice below.
+# dsh 0.2.1-alpha.3 accepts any concrete IP literal and refuses the wildcard (the previous release
+# could only take 127.0.0.1 or 0.0.0.0), so this block belongs with the upgrade, never before it.
+# DSH_BIND_HOST names the address explicitly; otherwise this container's own addresses are used, which
+# is where Docker's published port forwards. Nothing is guessed silently: several addresses, a
+# rejected value, or no address at all each say so and stop rather than serving a deployment that
+# only answers on loopback.
+bind_host=
 bind_source=
-if [ -n "${DSH_BIND_HOST:-}" ]; then
+for candidate in ${DSH_BIND_HOST:-}; do
+  bind_host="$candidate"
   bind_source=DSH_BIND_HOST
-else
-  # dsh refuses the wildcard and accepts any concrete literal, so name this container's own address:
-  # Docker's published port forwards to exactly that address. An IPv6-only or undeterminable address
-  # keeps dsh's shipped bind rather than failing to boot.
-  for addr in $(hostname -i 2> /dev/null); do
-    case "$addr" in
-      *:*) continue ;;
-      127.*) continue ;;
-    esac
-    DSH_BIND_HOST="$addr"
+done
+case "${bind_host}" in
+  "")
     bind_source="this container"
-    break
-  done
-fi
-if [ -n "${bind_source:-}" ]; then
-  set -- "$@" --host "$DSH_BIND_HOST"
-  echo "entrypoint: binding $DSH_BIND_HOST ($bind_source)" >&2
-else
-  echo "entrypoint: no concrete address to bind; dsh keeps its shipped bind" >&2
-fi
-
+    found_ipv4=
+    for addr in $(hostname -i 2> /dev/null); do
+      case "$addr" in
+        *:*) continue ;;
+        127.*) continue ;;
+      esac
+      found_ipv4="$found_ipv4 $addr"
+      [ -n "$bind_host" ] || bind_host="$addr"
+    done
+    if [ -z "$bind_host" ]; then
+      for addr in $(hostname -i 2> /dev/null); do
+        case "$addr" in
+          ::1 | 127.*) continue ;;
+        esac
+        bind_host="$addr"
+        break
+      done
+    fi
+    if [ -n "$found_ipv4" ] && [ "$(printf %s "$found_ipv4" | wc -w)" -gt 1 ]; then
+      echo "entrypoint: several addresses ($found_ipv4); binding $bind_host — set DSH_BIND_HOST to pick another" >&2
+    fi
+    ;;
+esac
+case "${bind_host}" in
+  "")
+    echo "entrypoint: no concrete address to bind; dsh would answer on loopback only. Set DSH_BIND_HOST to this container's address." >&2
+    exit 1
+    ;;
+  0.0.0.0 | :: | ::0 | "[::]")
+    echo "entrypoint: bind address $bind_host is the wildcard, which dsh refuses; name one concrete address." >&2
+    exit 1
+    ;;
+  *[!0-9a-fA-F.:%]*)
+    echo "entrypoint: bind address $bind_host is not an IP literal." >&2
+    exit 1
+    ;;
+esac
+set -- "$@" --host "$bind_host"
+echo "entrypoint: binding $bind_host ($bind_source)" >&2
 # The profile the image baked goes to a deployment that has none. An existing one keeps the packages
 # the image declares: anything missing, broken or behind the image's version is put in place as the
 # image installed it, and anything at that version or above — a pin, a fork, a link into a mounted
