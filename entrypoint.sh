@@ -149,25 +149,31 @@ for h in ${DSH_TRUSTED_HOSTS:-}; do
   set -- "$@" --trusted-host "$h"
 done
 
-# Binding every interface is what makes the UI reachable from another machine, and dsh refuses the
-# wildcard: "bind one concrete IPv4 or IPv6 address of a local interface instead". @idsh/remote-access
-# used to supply "0.0.0.0" from a config layer, which stops working the moment the host layer checks
-# first — an alpha upgrade is exactly that. Name this container's own address instead: Docker's
-# published port forwards to that address, so the deployment stays reachable. DSH_BIND_HOST overrides
-# it, and a container whose address cannot be worked out keeps dsh's shipped loopback bind rather than
-# failing to boot.
-if [ -z "${DSH_BIND_HOST:-}" ]; then
+# dsh 0.2.1-alpha.3 refuses the wildcard bind address and accepts any concrete literal; @idsh/remote-access
+# used to supply "0.0.0.0" from a config layer, which only worked while the command line was checked.
+# DSH_BIND_HOST overrides the choice below.
+bind_source=
+if [ -n "${DSH_BIND_HOST:-}" ]; then
+  bind_source=DSH_BIND_HOST
+else
+  # dsh refuses the wildcard and accepts any concrete literal, so name this container's own address:
+  # Docker's published port forwards to exactly that address. An IPv6-only or undeterminable address
+  # keeps dsh's shipped bind rather than failing to boot.
   for addr in $(hostname -i 2> /dev/null); do
     case "$addr" in
       *:*) continue ;;
       127.*) continue ;;
     esac
     DSH_BIND_HOST="$addr"
+    bind_source="this container"
     break
   done
 fi
-if [ -n "${DSH_BIND_HOST:-}" ]; then
+if [ -n "${bind_source:-}" ]; then
   set -- "$@" --host "$DSH_BIND_HOST"
+  echo "entrypoint: binding $DSH_BIND_HOST ($bind_source)" >&2
+else
+  echo "entrypoint: no concrete address to bind; dsh keeps its shipped bind" >&2
 fi
 
 # The profile the image baked goes to a deployment that has none. An existing one keeps the packages
