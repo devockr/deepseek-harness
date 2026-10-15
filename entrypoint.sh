@@ -149,6 +149,27 @@ for h in ${DSH_TRUSTED_HOSTS:-}; do
   set -- "$@" --trusted-host "$h"
 done
 
+# Binding every interface is what makes the UI reachable from another machine, and dsh refuses the
+# wildcard: "bind one concrete IPv4 or IPv6 address of a local interface instead". @idsh/remote-access
+# used to supply "0.0.0.0" from a config layer, which stops working the moment the host layer checks
+# first — an alpha upgrade is exactly that. Name this container's own address instead: Docker's
+# published port forwards to that address, so the deployment stays reachable. DSH_BIND_HOST overrides
+# it, and a container whose address cannot be worked out keeps dsh's shipped loopback bind rather than
+# failing to boot.
+if [ -z "${DSH_BIND_HOST:-}" ]; then
+  for addr in $(hostname -i 2> /dev/null); do
+    case "$addr" in
+      *:*) continue ;;
+      127.*) continue ;;
+    esac
+    DSH_BIND_HOST="$addr"
+    break
+  done
+fi
+if [ -n "${DSH_BIND_HOST:-}" ]; then
+  set -- "$@" --host "$DSH_BIND_HOST"
+fi
+
 # The profile the image baked goes to a deployment that has none. An existing one keeps the packages
 # the image declares: anything missing, broken or behind the image's version is put in place as the
 # image installed it, and anything at that version or above — a pin, a fork, a link into a mounted
