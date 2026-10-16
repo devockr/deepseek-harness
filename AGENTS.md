@@ -177,6 +177,23 @@ Observe the running thing; do not reason from source.
 - New workspace package → `pnpm install --force`, and drop `node_modules/.pnpm/lock.yaml` plus
   `.pnpm-workspace-state-v1.json` if the importer is skipped.
 
+## Releasing and CI
+
+- **Every action is pinned to a full commit SHA with its release tag in a trailing comment**
+  (`uses: actions/checkout@<sha> # v7.0.1`): a tag can be moved, a SHA cannot.
+- A change to a package under `packages/` needs a changeset (`.changeset/`). The `Release` workflow
+  folds those into one version PR and publishes it with `pnpm release` — `changeset publish`, which
+  runs each package's `prepack`, so the tarball it uploads always carries a fresh `lib/`.
+- **pnpm is pinned once, in `packageManager`**, which `pnpm/action-setup` reads — no `version:` in a
+  workflow. The `Dockerfile`'s `npm install -g pnpm@…` carries the same number and Renovate keeps
+  both current, so bump them together. It also gives `pnpm-lock.yaml` a second document (the `pnpm`
+  package and its `@pnpm/exe` set): that is pnpm 12 recording the managed version, not damage.
+- `autofix.yml` fixes formatting and autofixable lint on pull requests, and has to keep the name
+  `autofix.ci`; `pkg-pr-new.yml` runs `pkg-pr-new` through `pnpm dlx`, against that project's advice
+  to use the lockfile in CI, to keep a preview-only tool out of the workspace dependencies.
+- **Only `ci.yml` pins Node lines**: a matrix of 24 (what the images run) and 26 (the oldest line
+  `engines` allows). Every other workflow runs `lts/*`, because none of them decides what ships.
+
 ## Pull requests
 
 - Target `main`; a stacked PR uses the branch below as its base, and GitHub retargets it on merge.

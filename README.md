@@ -98,6 +98,18 @@ Ports and volumes:
   workspace or `./ssh:/home/app/.ssh` for an ssh config. The template deliberately
   prescribes none.
 
+## Releasing
+
+The companion packages under `packages/` are released with
+[changesets](.changeset/README.md). A pull request that changes one carries a changeset
+(`pnpm changeset`); merging it to `main` lets the [`Release`](.github/workflows/release.yml)
+workflow collect every pending changeset into one "Version Packages" pull request, and merging
+**that** publishes the bumped packages to npm. The `version` field in a package's manifest is an
+output of that flow, not something to edit by hand.
+
+What the images bake is a later step: [Renovate](renovate.json) raises the `dsh plugin …` lines in
+`Dockerfile` to the published versions.
+
 ## Notes
 
 - **Runs as your host user** — the container starts as root, re-points its `app`
