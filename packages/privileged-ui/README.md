@@ -90,25 +90,8 @@ prerelease satisfy a range that carries a prerelease on the _same_ `major.minor.
 `^0.2.0-rc.2` alone matches `0.2.0-rc.2` but not `0.2.1-alpha.3`. `^0.2.0-rc.2 || ^0.2.1-alpha.3`
 is the shortest form that accepts both; extend it when a new dsh line appears.
 
-Both floors are the lowest version that works, measured rather than assumed. Every candidate was
-checked twice — once with no plugins at all, once with these three installed — because a version
-that boots with none and hangs with them is incompatible, while a version that fails both ways
-would only be saying something about the harness.
-
-| dsh             | with no plugins | with these packages                       |
-| --------------- | --------------- | ----------------------------------------- |
-| `0.2.0-rc.1`    | boots           | hangs                                     |
-| `0.2.0-rc.2`    | —               | runs the deployment                       |
-| `0.2.1-alpha.1` | boots           | hangs, and one package is enough to do it |
-| `0.2.1-alpha.2` | boots           | hangs                                     |
-| `0.2.1-alpha.3` | boots           | passes the probe, markers included        |
-| `0.2.1-alpha.4` | boots           | passes the probe, markers included        |
-
-The two failures have one cause, and dsh names it: loading [`@idsh/remote-access`](../remote-access/)
-prints `patch: entry "webserver" not found`, because its `cordis.patch.yml` targets the `webserver` and
-`typert-gateway` rows of `@deepseek-ai/dsh-base` and those rows only join that graph at `0.2.1-alpha.3`.
-The patch has nowhere to land before it, and the instance never reaches its readiness line.
-
-So neither floor can move down: `rc.2` is the first working version of its line and `alpha.3` of
-its, and both are where the graph these packages patch first exists. `0.1.x` is not claimed at all — it predates the `0.2` surface these packages are built
-against, and dsh refuses the install there on the strength of this same range.
+The floors are a policy, not a compatibility measurement. dsh refuses to install a plugin whose peers
+do not match, so they decide what can be installed at all — but none of the measurements so far turns
+them into a compatibility boundary. Treat them as the versions this is developed and deployed
+against: `0.2.0-rc.2` is what the published image's `latest` tag points at and what a deployment runs,
+and `0.2.1-alpha.3` and later are what the dev image and the browser-driven checks run.
