@@ -43,10 +43,17 @@ services:
       # Space-separated authorities allowed by dsh's browser-trust fence; set it
       # to the host (or host:port) you reach this UI on, e.g. dsh.example.com.
       - DSH_TRUSTED_HOSTS=${DSH_TRUSTED_HOSTS:-dsh.example.com}
-      # Your key and the proxy settings, likewise from your shell or .env: an unset
-      # one is left unset rather than injected empty, and dsh reads both proxy
-      # spellings and adds its own loopback bypass.
-      - DEEPSEEK_API_KEY
+      # Address dsh binds. Left unset, the entrypoint uses this container's own address, which
+      # is where the published port forwards; set it when the container has several networks and
+      # the one Docker picked for the mapping is not the one your clients arrive on.
+      - DSH_BIND_HOST
+      # Public HTTP(S) root to advertise behind a prefix-stripping proxy; left unset when
+      # absent. Advertising grants no trust, so the authority above still has to name it.
+      - DSH_PUBLIC_URL
+      # Proxy settings, from your shell or .env: an unset one is left unset rather than
+      # injected empty, and dsh reads both proxy spellings and adds its own loopback bypass.
+      # The DeepSeek API key is deliberately absent: add it in the web UI's settings, so it never
+      # reaches the image or the process environment.
       - http_proxy
       - https_proxy
       - all_proxy

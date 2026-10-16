@@ -131,14 +131,8 @@ done
 CRED="$HOME/.dsh/.credentials.yaml"
 [ -f "$CRED" ] && chmod 600 "$CRED"
 
-# Binding every interface — what makes the Web UI reachable from another machine — is
-# done by @idsh/remote-access, not here. dsh refuses `--host 0.0.0.0` on the command line
-# on purpose, so a config layer is the only way to ask, and the package is that layer:
-# installed into the profile below, it lands under any `--patch` or profile patch, and its
-# `!!js` fallbacks keep `--host` and `--port` winning. This image used to carry its own
-# overlay for it, which shadowed the package and had to be kept in sync; with the package
-# absent — a profile that never had it, or one where it was removed — the server keeps
-# dsh's shipped loopback bind.
+# @idsh/remote-access describes the reachability rules in its own README; with it absent — a
+# profile that never had it, or one where it was removed — dsh keeps its shipped loopback bind.
 
 # The browser-trust fence rejects API requests whose Host is not loopback or a
 # trusted host. DSH_TRUSTED_HOSTS is a space-separated list of authorities
@@ -149,27 +143,84 @@ for h in ${DSH_TRUSTED_HOSTS:-}; do
   set -- "$@" --trusted-host "$h"
 done
 
+# Which address dsh should bind. Reachability used to come from @idsh/remote-access's config layer,
+# which only worked while dsh checked the command line alone; the newer releases validate the value
+# wherever it comes from and refuse the wildcard, and dsh owns that check. So the entrypoint decides
+# only which address to offer — DSH_BIND_HOST when set, otherwise this container's own, which is
+# where a published port forwards — and stops if it has none, since dsh would answer on loopback.
+# An explicit --host from the caller wins: appending ours would be parsed last and replace it, and a
+# caller may be opting back into loopback on purpose (packages/remote-access/README.md says so).
+explicit_host=
+for arg in "$@"; do
+  case "$arg" in
+    --host | --host=*) explicit_host=1 ;;
+  esac
+done
+if [ -n "$explicit_host" ]; then
+  echo "entrypoint: --host was passed in; leaving the bind address to it" >&2
+else
+  bind_host="${DSH_BIND_HOST:-}"
+  if [ -n "$bind_host" ]; then
+    echo "entrypoint: binding $bind_host (DSH_BIND_HOST)" >&2
+  else
+    # One pass: an IPv4 address wins outright and an IPv6 one is kept only as a fallback; an
+    # address carrying an interface zone id is skipped, since no URL can express one. All of
+    # them are listed with the choice, so a multi-network container is not a silent guess.
+    addresses=$(hostname -i 2> /dev/null)
+    for addr in $addresses; do
+      case "$addr" in
+        ::1 | 127.*) continue ;;
+        *%*) continue ;;
+        *:*) bind_host="${bind_host:-$addr}" ;;
+        *)
+          bind_host="$addr"
+          break
+          ;;
+      esac
+    done
+    if [ -z "$bind_host" ]; then
+      echo "entrypoint: no bind address found; set DSH_BIND_HOST. dsh's default answers on loopback only." >&2
+      exit 1
+    fi
+    echo "entrypoint: binding $bind_host (this container; addresses: $addresses)" >&2
+  fi
+  set -- "$@" --host "$bind_host"
+fi
+
+# Advertise the root a reverse proxy fronts (--public-url); no-op when unset.
+if [ -n "${DSH_PUBLIC_URL:-}" ]; then
+  set -- "$@" --public-url "$DSH_PUBLIC_URL"
+fi
 # The profile the image baked goes to a deployment that has none. An existing one keeps the packages
 # the image declares: anything missing, broken or behind the image's version is put in place as the
 # image installed it, and anything at that version or above — a pin, a fork, a link into a mounted
 # checkout — is left alone. No boot downloads anything. Disabling is dropping a package from the
 # bundle list, not uninstalling it; nothing is ever removed, and nothing here names a package.
 profile="$HOME/.dsh/profiles/web"
+# The baked profile keeps its `link:` packages as symlinks written relative to /opt/dsh/home, which
+# stop resolving once the profile lives under $HOME — dsh then skips those bundles entirely — so the
+# same repair runs here. Ownership is fixed before stopping: the script replaces packages one at a
+# time as root, so a failure halfway through would otherwise leave the ones already swapped
+# root-owned in the host bind mount, which is what the chown after it is for.
+repair_profile() {
+  if ! node /opt/dsh/tools/sync-companions.mts; then
+    echo "entrypoint: could not repair the companion packages" >&2
+    chown -R "$PUID:$PGID" "$1" || echo "entrypoint: could not fix the profile ownership" >&2
+    exit 1
+  fi
+  chown -R "$PUID:$PGID" "$1" || echo "entrypoint: could not fix the profile ownership" >&2
+}
+
 if [ ! -d "$profile" ] && [ -d /opt/dsh/home/.dsh/profiles/web ]; then
   mkdir -p "$HOME/.dsh/profiles"
   cp -a /opt/dsh/home/.dsh/profiles/web "$HOME/.dsh/profiles/"
-  chown -R "$PUID:$PGID" "$profile"
+  repair_profile "$profile"
 elif [ -d "$profile" ] && [ ! -f "$profile/package.json" ]; then
   # Half-initialised: fill it in place, or the copy above would nest itself one level down.
   cp -a /opt/dsh/home/.dsh/profiles/web/. "$profile/"
-  chown -R "$PUID:$PGID" "$profile"
+  repair_profile "$profile"
 elif [ -d /opt/dsh/home/.dsh/profiles/web/node_modules ]; then
-  # Ownership is fixed whatever the script did: it replaces packages one at a time as root, so a
-  # failure halfway through would otherwise leave the ones already swapped in root-owned.
-  node /opt/dsh/tools/sync-companions.mts \
-    || echo "entrypoint: could not repair the companion packages" >&2
-  chown -R "$PUID:$PGID" "$HOME/.dsh/profiles/web" \
-    || echo "entrypoint: could not fix the profile ownership" >&2
+  repair_profile "$HOME/.dsh/profiles/web"
 fi
 
 # Drop privileges before exec: dsh and everything it spawns must run as the host

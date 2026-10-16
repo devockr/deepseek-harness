@@ -10,9 +10,13 @@
  * not re-download it.
  *
  * Usage:
- *   node tools/ui-probe.mts [--install <pnpm-spec>]... [--host <host>] [--keep] [--shot <name>]
+ *   node tools/ui-probe.mts [--install <pnpm-spec>]... [--bare] [--host <host>] [--keep] [--shot <name>]
  *
- * --install     add a package to the probe profile before booting (repeatable)
+ * --install     add a package to the probe profile before booting (repeatable); a spec whose
+ *               package is already there replaces it
+ * --bare        start from the shipped web template alone, without the plugin set the image
+ *               baked. The default inherits that set, since finding bugs in those plugins is
+ *               what this tool is for; --bare narrows down which one is at fault
  * --host        the authority to browse, default 127.0.0.1; pass a LAN address to
  *               reproduce what a remote page sees
  * --keep        leave the probe instance and its $DSH_HOME behind for poking
@@ -87,8 +91,21 @@ const HOME_EXISTED =
   ))
 const SHOTS = process.env.PROBE_SHOTS ?? '/home/app/.dsh/cache/ui-probe'
 const PROFILE = process.env.PROBE_PROFILE ?? 'probe'
+// Every use of it is a path component under PROFILES, and the --bare cleanup deletes that tree, so
+// a value that is anything but a single directory name is refused rather than joined onto a path.
+if (!/^\w[\w.-]*$/.test(PROFILE)) {
+  throw new Error(
+    `PROBE_PROFILE must be a single directory name, not ${JSON.stringify(PROFILE)}`,
+  )
+}
 const HOST = values('--host')[0] ?? '127.0.0.1'
 const INSTALLS = values('--install')
+/**
+ * The plugin set the image baked, which is exactly what a deployment gets. A probe that only ever
+ * saw the shipped template could not find a bug in those plugins, which is the tool's purpose, so
+ * this set is installed by default; `--install` follows it and replaces any package it names.
+ */
+const BARE = flag('--bare')
 const KEEP = flag('--keep')
 const SHOT = values('--shot')[0] ?? 'probe'
 const SCENARIO = values('--scenario')[0]
@@ -174,9 +191,59 @@ const run = (
     )
   })
 
+/**
+ * The plugin sources the image baked, by the same rule Dockerfile.dev bakes them: every directory
+ * under /opt/dsh/packages whose manifest declares a `dsh` field. That directory is world-readable
+ * on purpose, so this needs nothing the image does not already publish.
+ */
+async function bakedSpecs(): Promise<string[]> {
+  const root = '/opt/dsh/packages'
+  let dirs: string[]
+  try {
+    dirs = await fs.readdir(root)
+  } catch {
+    // Not the image that baked them; there is nothing to inherit.
+    return []
+  }
+  const specs: string[] = []
+  for (const dir of dirs) {
+    try {
+      const parsed = JSON.parse(
+        await fs.readFile(path.join(root, dir, 'package.json'), 'utf8'),
+      ) as { dsh?: unknown }
+      if (parsed.dsh) {
+        specs.push(`link:${path.join(root, dir)}`)
+      }
+    } catch {
+      // A directory without a readable manifest is not a dsh plugin.
+    }
+  }
+  return specs
+}
+
+/** Say which set is in play: a silent default that installed nothing reads as success. */
+function reportBaked(inherited: string[]) {
+  const found =
+    inherited.length > 0 ? `${inherited.length} to install` : 'none found'
+  process.stdout.write(`image plugin set: ${found}\n`)
+  if (inherited.length === 0) {
+    process.stderr.write(
+      'probe: no plugin sources under /opt/dsh/packages; name them with --install\n',
+    )
+  }
+}
+
 /** The probe profile: created from the shipped web template, never the live one. */
 async function prepareProfile() {
   await fs.mkdir(HOME, { recursive: true })
+  // `--bare` has to mean an empty profile even when an earlier run left one behind: the probe
+  // reuses PROBE_HOME, so without this a bare run would boot whatever that run installed.
+  if (BARE) {
+    await fs.rm(path.join(HOME, 'profiles', PROFILE), {
+      recursive: true,
+      force: true,
+    })
+  }
   // Idempotent: a crashed earlier run leaves the profile behind, and recreating it is
   // an error rather than a no-op.
   const profileManifest = path.join(HOME, 'profiles', PROFILE, 'package.json')
@@ -198,15 +265,27 @@ async function prepareProfile() {
       )
     }
   }
-  for (const spec of INSTALLS) {
+  // Say which set is in play: a silent default that installed nothing looked exactly like a
+  // successful run that found no plugin problems.
+  const inherited = BARE ? [] : await bakedSpecs()
+  if (!BARE) {
+    reportBaked(inherited)
+  }
+  const specs: Array<[string, string]> = [
+    ...inherited.map((spec): [string, string] => [spec, 'image']),
+    ...INSTALLS.map((spec): [string, string] => [spec, '--install']),
+  ]
+  for (const [spec, source] of specs) {
     const r = await run(['plugin', '--profile', PROFILE, 'add', spec])
     process.stdout.write(
-      `install ${spec}: ${r.status === 0 ? 'ok' : 'FAILED'}\n`,
+      `install (${source}) ${spec}: ${r.status === 0 ? 'ok' : 'FAILED'}\n`,
     )
     if (r.status !== 0) {
-      // Booting anyway would probe a profile without the plugin the caller asked for, and still
-      // exit 0 — fail here, where the message means something.
-      throw new Error(`could not install ${spec}:\n${r.stdout}${r.stderr}`)
+      // Booting anyway would probe a profile without the plugin that was asked for — the baked
+      // set or the caller's — and still exit 0. Fail here, where the message means something.
+      throw new Error(
+        `could not install ${spec} (from ${source}):\n${r.stdout}${r.stderr}`,
+      )
     }
   }
 }
@@ -214,35 +293,26 @@ async function prepareProfile() {
 /**
  * Boot the instance, wait for the readiness line, return { url, token, child }.
  *
- * Browsing a non-loopback authority is what reproduces a remote page, and that needs
- * the server to bind one — `dsh web --host 0.0.0.0` is refused by design, so the bind
- * goes in as a patch overlay (the same way a deployment does it). The `!!js` port
- * fallback keeps `--port 0` working.
+ * `--host` is what defines `ctx.webStartup.host`. The baked profile ships
+ * @idsh/remote-access, whose webserver row falls back to the wildcard when that is undefined,
+ * and 0.2.1-alpha.2 and later refuse the wildcard from any layer — so leaving the bind to the
+ * profile cannot boot at all, and a patch overlay is not needed to say one concrete address.
  */
 async function boot() {
   // Launcher options have to precede the app's: the launcher hands everything from
-  // the first token it does not recognize to the app, so `--patch` must come before
+  // the first token it does not recognize to the app, so `--host` must come before
   // `--port`.
-  const args = ['--profile', PROFILE]
-  if (!isLoopback(HOST)) {
-    const patch = path.join(HOME, 'bind-all-interfaces.patch.yml')
-    await fs.writeFile(
-      patch,
-      [
-        '- id: webserver',
-        "  name: '@deepseek-ai/dsh-host-webserver'",
-        '  config:',
-        "    host: '0.0.0.0'",
-        '    port: !!js ctx.webStartup.port ?? 3080',
-        '    compression: gzip',
-        '    compressionLevel: 1',
-        '    compressionThresholdBytes: 1024',
-        '',
-      ].join('\n'),
-    )
-    args.push('--patch', patch)
-  }
-  args.push('--port', '0', '--no-open')
+  const args = [
+    '--profile',
+    PROFILE,
+    '--host',
+    // dsh takes one concrete IP literal, and `isLoopback` also accepts `localhost` and `[::1]`:
+    // normalise those to 127.0.0.1, the authority the printed URL uses anyway.
+    isLoopback(HOST) ? '127.0.0.1' : HOST,
+    '--port',
+    '0',
+    '--no-open',
+  ]
   child = spawn(...dshArgv(args), {
     env: { ...process.env, DSH_HOME: HOME },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -431,7 +501,28 @@ const PHONE = { hasTouch: true, viewport: { width: 390, height: 844 } }
 const page = await browser.newPage(
   SCENARIO === 'mobile' ? PHONE : { viewport: { width: 1280, height: 900 } },
 )
-const problems = []
+// A scenario assertion, as opposed to a problem worth reading: the run has to fail on it.
+const failures: string[] = []
+
+/** The marker's last stage is the icon: a run that stopped short is a failure, not a value. */
+function checkMobileMarker(probe: {
+  marker?: string
+  appleTouchIcon: boolean
+}): void {
+  const marker = probe.marker
+  if (!marker?.includes('icon:')) {
+    failures.push(
+      `the mobile marker never reached its icon stage: ${marker ?? '(absent)'}`,
+    )
+  } else if (!marker.endsWith('icon:ok')) {
+    failures.push(`the mobile marker stopped at ${marker}`)
+  }
+  if (!probe.appleTouchIcon) {
+    failures.push('no apple-touch-icon was injected')
+  }
+}
+
+const problems: string[] = []
 let completed = false
 // Everything, not just errors: cordis reports an unmet `inject` as a warning the
 // boot audit later summarizes as a bare "failed".
@@ -460,6 +551,22 @@ try {
   // moment, then describe what we actually got instead of asserting a selector we
   // guessed.
   await page.waitForTimeout(WAIT_AFTER_LOAD_MS)
+
+  // `mark()` writes the marker twice: the CSS half first, the icon once the artwork is ready, which
+  // is a fetch and a canvas encode later. An absent marker is not a settled one either — the plugin
+  // writes after activation, which can be later than this point — so this waits for the icon either
+  // way and only the timeout ends it; --scenario mobile is what fails the run when it never comes.
+  try {
+    await page.waitForFunction(
+      (stage: string) =>
+        document.body.dataset.idshMobile?.includes(stage) ?? false,
+      'icon:',
+      { timeout: WAIT_FOR_SETTLE_MS },
+    )
+  } catch {
+    // It never settled: a plugin that could not reach its last stage. The snapshot below reports
+    // what is there, and --scenario mobile is where that becomes an assertion.
+  }
 
   // Scenarios exist because "the flag flipped" is not the same answer as "the
   // privileged surface behaves". Discovery first: click the entry and report the
@@ -676,7 +783,7 @@ try {
     })
     // The rewrite is the point of this scenario, so it has to fail the run when it stops working.
     if (probe.enterEvents.length > 0) {
-      problems.push(
+      failures.push(
         `the plain Enter reached the document: ${JSON.stringify(probe.enterEvents)}`,
       )
     }
@@ -684,15 +791,16 @@ try {
       probe.insertedBreaks.length !== 2 ||
       !probe.insertedBreaks.every(inputType => inputType === 'insertLineBreak')
     ) {
-      problems.push(
+      failures.push(
         `the composer was not sent insertLineBreak twice: ${JSON.stringify(probe.insertedBreaks)}`,
       )
     }
     if (probe.inputEvents.length !== 1 || probe.inputEvents[0] !== 'Enter') {
-      problems.push(
+      failures.push(
         `the session-search input lost its own Enter: ${JSON.stringify(probe.inputEvents)}`,
       )
     }
+    checkMobileMarker(probe)
     process.stdout.write(`mobile probe : ${JSON.stringify(probe)}\n`)
     await page.screenshot({ path: path.join(SHOTS, `${SHOT}-mobile.png`) })
   }
@@ -718,12 +826,16 @@ try {
       `visible text: ${facts.text}`,
       `screenshot  : ${shot}`,
       `problems    : ${problems.length > 0 ? '\n  ' + problems.join('\n  ') : 'none'}`,
+      `failures    : ${failures.length > 0 ? '\n  ' + failures.join('\n  ') : 'none'}`,
       `console log : ${console_all.length > 0 ? '\n  ' + console_all.slice(-LOG_TAIL_LINES).join('\n  ') : 'none'}`,
     ].join('\n') + '\n',
   )
   completed = true
 } finally {
   await browser.close()
+  // Set before the branch: without --keep the process simply ends, and the exit code has to
+  // say the same thing it says when the instance is left behind.
+  process.exitCode = completed && failures.length === 0 ? 0 : 1
   if (KEEP) {
     // Printing and returning leaves the piped server attached to this process, so the probe would
     // never give the shell back: unref the child and end on purpose, leaving it running. `else`, not
@@ -732,7 +844,6 @@ try {
       `kept: ${HOME} (pid ${child?.pid})\n${out.slice(-OUTPUT_TAIL_CHARS)}\n`,
     )
     child?.unref()
-    process.exitCode = completed ? 0 : 1
   } else {
     child?.kill('SIGTERM')
   }

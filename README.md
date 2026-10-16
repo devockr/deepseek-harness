@@ -5,19 +5,22 @@ Dockerized [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (
 ## Requirements
 
 - Docker with BuildKit + Docker Compose v2
-- A DeepSeek API key
 
 ## Getting started
 
-1. Provide the API key and host uid/gid (export them, or drop them in a `.env`
+1. Provide the host uid/gid (export them, or drop them in a `.env`
    in this directory):
 
    ```sh
-   export DEEPSEEK_API_KEY=sk-...
-   export UID GID
+   export UID            # both shells define the real UID
+   export GID="$(id -g)" # bash defines only UID; zsh defines GID too
    ```
 
    `.env` is gitignored, so it is safe to keep in the working directory.
+
+   The DeepSeek API key is **not** an environment variable: add it once the container is up, in the
+   web UI's settings. It is kept in the state directory, so it survives a rebuild and never reaches
+   the image or the process environment.
 
 2. Create your compose file from the template and build:
 
@@ -36,7 +39,10 @@ Dockerized [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (
 
    ```sh
    docker compose logs dsh
-   # dsh web: http://127.0.0.1:3080/?token=...
+   # dsh web: http://<the address it bound>:3080/?token=...
+   #   take the token from that line; the address in it is the one inside the container,
+   #   so open it through the published port as in the next step (`--public-url` replaces
+   #   the address when set, and then the logged URL is the one to open)
    ```
 
 4. Open it in your browser (note the host port is `15080`):
@@ -45,15 +51,22 @@ Dockerized [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (
    http://<host>:15080/?token=<token>
    ```
 
-The image bakes [`@idsh/remote-access`](packages/remote-access/) into a fresh profile, which binds
-the server to every interface — that is what makes the published port work at all, since a listener
-on `127.0.0.1` _inside_ the container cannot receive a connection forwarded to its address. It also
-means every LAN address reaches the UI once the port is published; read that package's security notes
-first. To keep the server on loopback instead, **disable** the package — the UI's Plugins page, or
-dropping it from `dsh.profile.bundles` — rather than uninstalling it, since a package the image
-declares is put back on the next start; or patch the host back to `127.0.0.1`.
-Either way, reach dsh through the container's own network namespace (`docker exec`, or
-`docker run --network container:dsh`), because a published port will no longer carry it.
+The entrypoint decides what the server binds: it hands dsh this container's own address, which is
+the address a published port forwards to — a listener on `127.0.0.1` _inside_ the container cannot
+receive such a connection. An explicit `--host` wins and `DSH_BIND_HOST` overrides the choice; set
+`DSH_BIND_HOST=127.0.0.1` to keep the server on loopback, where a published port cannot reach it and
+you go through the container's own network namespace instead (`docker exec`, or
+`docker run --network container:dsh`). Binding one address means every LAN address reaches the UI
+once the port is published; read [`@idsh/remote-access`](packages/remote-access/)'s security notes
+before exposing it.
+
+The image also bakes that package into a fresh profile, where its live job is the UI's multiplexed
+WebSocket: it raises the heartbeat interval so the connection survives a stall. Its `0.0.0.0`
+fallback for the bind is unreachable, because the entrypoint already defines the address and
+0.2.1-alpha.2 and later refuse the wildcard wherever it comes from. Disabling the package — the
+UI's Plugins page, or dropping it from `dsh.profile.bundles` — therefore no longer returns the
+server to loopback; `DSH_BIND_HOST` is what does that. Nothing is uninstalled either way, since a
+package the image declares is put back on the next start.
 
 The token rotates on every restart.
 
@@ -61,13 +74,14 @@ The token rotates on every restart.
 
 Environment variables (see `docker-compose.example.yml`):
 
-| Variable                                                | Purpose                                                                                         | Default                           |
-| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------- |
-| `DEEPSEEK_API_KEY`                                      | DeepSeek API key — the highest-priority credential source                                       | —                                 |
-| `PUID` / `PGID`                                         | uid/gid dsh runs as (and owns bind-mounted files as); compose forwards the host's `$UID`/`$GID` | `$UID` / `$GID`                   |
-| `NPM_REGISTRY`                                          | npm/pnpm/yarn registry: the image build and the user-level configs use it                       | `https://registry.npmmirror.com/` |
-| `DSH_TRUSTED_HOSTS`                                     | Space-separated host authorities allowed by dsh's browser-trust fence                           | `dsh.example.com`                 |
-| `http_proxy` / `https_proxy` / `all_proxy` / `no_proxy` | Outbound proxy for dsh's HTTP requests                                                          | —                                 |
+| Variable                                                | Purpose                                                                                                                                                                                                    | Default                           |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| `PUID` / `PGID`                                         | uid/gid dsh runs as (and owns bind-mounted files as); compose forwards the host's `$UID`/`$GID`                                                                                                            | `$UID` / `$GID`                   |
+| `NPM_REGISTRY`                                          | npm/pnpm/yarn registry: the image build and the user-level configs use it                                                                                                                                  | `https://registry.npmmirror.com/` |
+| `DSH_TRUSTED_HOSTS`                                     | Space-separated host authorities allowed by dsh's browser-trust fence                                                                                                                                      | `dsh.example.com`                 |
+| `DSH_PUBLIC_URL`                                        | Public HTTP(S) root to advertise behind a prefix-stripping proxy; pair it with `DSH_TRUSTED_HOSTS`                                                                                                         | —                                 |
+| `DSH_BIND_HOST`                                         | Concrete address dsh binds, defaulting to the container's own (the wildcard is refused): set it to `127.0.0.1` to give up remote reach, or to one address when several networks make the default ambiguous | this container                    |
+| `http_proxy` / `https_proxy` / `all_proxy` / `no_proxy` | Outbound proxy for dsh's HTTP requests                                                                                                                                                                     | —                                 |
 
 At boot the registry is written into `~/.npmrc`, `~/.yarnrc` and `~/.yarnrc.yml` (corepack
 and node-gyp mirrors follow), not into the environment — so a project that pins its own
@@ -96,6 +110,6 @@ Ports and volumes:
   flags, so they can't override `--profile web`.
 - **Sandbox** — dsh's file sandbox needs user namespaces or Landlock. On hosts without them (e.g. Synology's 4.4 kernel), either set `DSH_PERMISSION_MODE=danger-full-access`, or approve the `danger-full-access` escalation when prompted in the UI.
 - **Plugins** — the image bakes a profile when it is built: dsh's own `web` template plus its companion packages — [`@idsh/remote-access`](packages/remote-access/), [`@idsh/privileged-ui`](packages/privileged-ui/) (the settings page over the LAN, which the image used to `sed` into dsh) and [`@idsh/mobile`](packages/mobile/) (the touch CSS, Enter as a line break, and the home-screen icon) — installed from npm by name (the dev image, what we run locally, bakes this checkout's `packages/` as `link:`s instead). A deployment without a profile starts from that one; an existing profile keeps those packages at the version the image declares — compared by each package's own `package.json` — putting back anything missing, broken or below it, exactly as the image installed it (a link in the dev image, where a built checkout mounted at `/opt/dsh/packages` is what runs — edit, rebuild, restart; files otherwise). Anything at that version or above is left alone, which is where a pinned version or a fork lives, and a package is turned off by dropping it from the bundle list (the UI's Plugins page), not by uninstalling it. Plugins live in the `.dsh` mount and survive recreations.
-- **UI probe** — `node tools/ui-probe.mts` boots a throwaway instance in an isolated `$DSH_HOME` and drives it with a real browser, so a client plugin's runtime behaviour can be checked without touching the live profile. It needs the `:dev` image — `pnpm dev` builds it from a checkout, and `docker-compose.dev.yml` carries the browser settings it reads, which needs Compose 2.24.4+ for its `!reset` tag — which is the one carrying the browser libraries; `--no-browser` skips the browser and checks the served boot graph instead.
-- **Remote exposure** — [`@idsh/remote-access`](packages/remote-access/) binds the UI to every interface, which also puts every LAN address into dsh's browser-trust fence. Put TLS and auth (or a VPN) in front unless that network is trusted; see that package's README.
+- **UI probe** — `node tools/ui-probe.mts` boots a throwaway instance in an isolated `$DSH_HOME` and drives it with a real browser, so a client plugin's runtime behaviour can be checked without touching the live profile. It installs the plugin set the image baked — what a deployment gets — and `--install <pnpm-spec>` adds to or replaces that, which is how a checkout or a candidate package is probed; `--bare` starts from the shipped template alone, for narrowing down which plugin is at fault. It needs the `:dev` image — `pnpm dev` builds it from a checkout, and `docker-compose.dev.yml` carries the browser settings it reads, which needs Compose 2.24.4+ for its `!reset` tag — which is the one carrying the browser libraries; `--no-browser` skips the browser and checks the served boot graph instead.
+- **Remote exposure** — what reaches the UI is the address the entrypoint binds and the port you publish: a published port forwards to that address, and the bind also puts it into dsh's browser-trust fence. Put TLS and auth (or a VPN) in front unless that network is trusted; see [`@idsh/remote-access`](packages/remote-access/)'s README for what the package itself does.
 - **HTTPS reverse proxy** — if you front this with nginx, keep the `Host` header intact (`proxy_set_header Host $http_host;`) so the browser-trust fence passes, and add WebSocket upgrade headers.

@@ -5,4 +5,5 @@ packages:
 allowBuilds:
   unrs-resolver: false
 minimumReleaseAgeExclude:
-  - '@1stg/eslint-config@10.3.2'
+  - '@1stg/*'
+  - '@deepseek-ai/*'

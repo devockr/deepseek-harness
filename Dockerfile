@@ -59,7 +59,7 @@ RUN --mount=type=cache,id=apt_cache,target=/var/cache/apt,sharing=locked \
 ARG NPM_REGISTRY=https://registry.npmmirror.com/
 
 RUN --mount=type=cache,id=npm_cache,target=/root/.npm \
-  npm install -g --registry="$NPM_REGISTRY" @deepseek-ai/dsh@0.2.0-rc.2 pnpm@12.11.2
+  npm install -g --registry="$NPM_REGISTRY" @deepseek-ai/dsh@0.2.1-alpha.4 pnpm@12.11.2
 
 # This image used to patch dsh's installed JavaScript here: the loopback gate the
 # settings page hides behind, the touch CSS, the home-screen icon, and the composer's
@@ -97,5 +97,7 @@ RUN mkdir -p /opt/dsh/home \
   && export HOME=/opt/dsh/home \
   && printf 'registry=%s\n' "$NPM_REGISTRY" > "$HOME/.npmrc" \
   && dsh web --dump-config > /dev/null \
-  && dsh plugin --profile web add @idsh/remote-access@0.1.0 \
+  && dsh plugin --profile web add @idsh/mobile@0.0.0 \
+  && dsh plugin --profile web add @idsh/privileged-ui@0.0.0 \
+  && dsh plugin --profile web add @idsh/remote-access@0.0.0 \
   && test -f /opt/dsh/home/.dsh/profiles/web/package.json
