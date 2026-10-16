@@ -45,13 +45,13 @@ importers:
         specifier: ^4.0.4 || ^4.0.5-alpha.2
         version: 4.0.5-alpha.2
       '@deepseek-ai/dsh-api-gateway':
-        specifier: ^0.2.0-rc.2 || ^0.2.1-alpha.3
+        specifier: ^0.2.0-rc.1 || ^0.2.1-alpha.1
         version: 0.2.1-alpha.3(@deepseek-ai/cordis@4.0.5-alpha.2)
       '@deepseek-ai/dsh-client-connection':
-        specifier: ^0.2.0-rc.2 || ^0.2.1-alpha.3
+        specifier: ^0.2.0-rc.1 || ^0.2.1-alpha.1
         version: 0.2.1-alpha.3(@deepseek-ai/cordis@4.0.5-alpha.2)(@deepseek-ai/dsh-scope@0.2.1-alpha.3(@deepseek-ai/cordis@4.0.5-alpha.2))
       '@deepseek-ai/dsh-client-modules':
-        specifier: ^0.2.0-rc.2 || ^0.2.1-alpha.3
+        specifier: ^0.2.0-rc.1 || ^0.2.1-alpha.1
         version: 0.2.1-alpha.3(@deepseek-ai/cordis@4.0.5-alpha.2)
 
   packages/privileged-ui:
@@ -60,13 +60,13 @@ importers:
         specifier: ^4.0.4 || ^4.0.5-alpha.2
         version: 4.0.5-alpha.2
       '@deepseek-ai/dsh-api-gateway':
-        specifier: ^0.2.0-rc.2 || ^0.2.1-alpha.3
+        specifier: ^0.2.0-rc.1 || ^0.2.1-alpha.1
         version: 0.2.1-alpha.3(@deepseek-ai/cordis@4.0.5-alpha.2)
       '@deepseek-ai/dsh-client-connection':
-        specifier: ^0.2.0-rc.2 || ^0.2.1-alpha.3
+        specifier: ^0.2.0-rc.1 || ^0.2.1-alpha.1
         version: 0.2.1-alpha.3(@deepseek-ai/cordis@4.0.5-alpha.2)(@deepseek-ai/dsh-scope@0.2.1-alpha.3(@deepseek-ai/cordis@4.0.5-alpha.2))
       '@deepseek-ai/dsh-client-modules':
-        specifier: ^0.2.0-rc.2 || ^0.2.1-alpha.3
+        specifier: ^0.2.0-rc.1 || ^0.2.1-alpha.1
         version: 0.2.1-alpha.3(@deepseek-ai/cordis@4.0.5-alpha.2)
 
   packages/remote-access: {}
