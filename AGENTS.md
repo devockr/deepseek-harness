@@ -197,12 +197,18 @@ Observe the running thing; do not reason from source.
   `tools/sync-image-pins.mts`, so the version pull request bumps the `dsh plugin …` lines with the
   manifests — never by hand. The script only moves the version and keeps each line's shape, because
   `renovate.json`'s second custom manager still reads those lines.
-- **The image is published from the action's own publish result.** `release.yml` exposes the
-  changesets action's `published` and `published-packages`, and its `image` job runs only on
-  `published == 'true'`: it pushes `Dockerfile`'s final stage — not `:base`, which is a stage — to
-  `ghcr.io/devockr/idsh` as `:latest` and `:sha-<commit>`, for `linux/amd64`. A change that publishes
-  no package therefore does not rebuild the published image: an `entrypoint.sh` or `Dockerfile` fix
-  reaches it with the next release.
+- **The image has a version of its own, in `image/`**: a private package that carries nothing else, so
+  changesets bumps it and never publishes it (`privatePackages.version`; npm never sees it), and
+  `release.yml` tags the image with it. A changeset whose change reaches the image should name
+  `@idsh/image` alongside the packages, or the image is rebuilt under its previous version.
+- **The image is published from the action's own results.** `release.yml` exposes the changesets
+  action's `published` and `published-packages`, and reads `released`/`version` from
+  `image/package.json` against `github.event.before` — an image-only release publishes nothing, so
+  `published` alone cannot trigger it. The `image` job pushes `Dockerfile`'s final stage — not
+  `:base`, which is a stage — to `ghcr.io/devockr/idsh` as `:latest`, `:sha-<commit>` and, when the
+  version moved, `:<version>`, for `linux/amd64`. A change that neither publishes a package nor moves
+  the version does not rebuild the published image: an `entrypoint.sh` fix reaches it with the next
+  release.
 
 ## Pull requests
 

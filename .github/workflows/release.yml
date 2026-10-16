@@ -11,28 +11,33 @@ concurrency:
   # rest not.
   cancel-in-progress: false
 
-# `id-token` is what npm's trusted publishing uses, so publishing needs no NPM_TOKEN; `contents`
-# and `pull-requests` are what the version commit and the "Version Packages" pull request need.
+# Least privilege at the top; a job asks for what it needs.
 permissions:
-  contents: write
-  id-token: write
-  pull-requests: write
+  contents: read
 
 jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    # What the image job waits on — changesets' own publish result, not a rule of ours: `published`
-    # is `'true'` only on the push that put packages on npm, the same push that leaves `main`
-    # naming the versions `Dockerfile` installs.
+    permissions:
+      # `id-token` is what npm's trusted publishing uses, so publishing needs no NPM_TOKEN; `contents`
+      # and `pull-requests` are what the version commit and the "Version Packages" pull request need.
+      contents: write
+      id-token: write
+      pull-requests: write
+    # What the image job waits on: changesets' own npm result, and the image's version, which a
+    # release can move without publishing anything — `image/` is private.
     outputs:
       published: ${{ steps.changesets.outputs.published }}
       published-packages: ${{ steps.changesets.outputs.published-packages }}
+      released: ${{ steps.image-version.outputs.released }}
+      version: ${{ steps.image-version.outputs.version }}
     steps:
       - name: Checkout Repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Changesets writes each changelog from the commits since the last release.
+          # Changesets writes each changelog from the commits since the last release, and the version
+          # this push releases is read from the commit before it.
           fetch-depth: 0
 
       - name: Setup pnpm
@@ -46,6 +51,24 @@ jobs:
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
+
+      # The image's version is `image/package.json`, bumped by a changeset like any other release.
+      # A release that only moves it publishes nothing, so `published` cannot be the only signal.
+      - name: Read the image version this push releases
+        id: image-version
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          now=$(node -p "require('./image/package.json').version")
+          before=$(git show "$BEFORE:image/package.json" 2>/dev/null | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version" 2>/dev/null || true)
+          {
+            echo "version=$now"
+            if [ -n "$before" ] && [ "$now" != "$before" ]; then
+              echo "released=true"
+            else
+              echo "released=false"
+            fi
+          } >> "$GITHUB_OUTPUT"
 
       - name: Create Release Pull Request or Publish to npm
         id: changesets
@@ -62,13 +85,12 @@ jobs:
   image:
     name: Publish the image
     needs: release
-    # Changesets decides this, through its own publish result: the versions `Dockerfile` installs are
-    # the ones the version pull request bumped, so the image can only be built once that release has
-    # published them.
-    if: needs.release.outputs.published == 'true'
+    # Changesets decides this, through its own results: the release either published packages or moved
+    # the image's version. Either way `Dockerfile` names versions that are now on the registry, which
+    # is what the build that installs them needs.
+    if: needs.release.outputs.published == 'true' || needs.release.outputs.released == 'true'
     runs-on: ubuntu-latest
-    # The workflow's permissions are the release job's; this one reads the repository and writes its
-    # own package.
+    # `contents` is the top-level grant; this job adds the package it writes.
     permissions:
       contents: read
       packages: write
@@ -88,15 +110,40 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Record the published packages
+      # `latest` and the commit always; the version only when this release moved it, so a version tag
+      # is never rewritten by a release that did not.
+      - name: Work out the tags
+        id: tags
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
+          RELEASED: ${{ needs.release.outputs.released }}
+        run: |
+          {
+            echo 'ghcr.io/devockr/idsh:latest'
+            echo "ghcr.io/devockr/idsh:sha-${GITHUB_SHA}"
+            if [ "$RELEASED" = 'true' ]; then
+              echo "ghcr.io/devockr/idsh:${VERSION}"
+            fi
+          } > "$RUNNER_TEMP/tags"
+          {
+            echo 'tags<<TAGS'
+            cat "$RUNNER_TEMP/tags"
+            echo 'TAGS'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Record what was published
         env:
           PUBLISHED: ${{ needs.release.outputs.published-packages }}
         run: |
           {
             echo '### Published by this release'
-            echo '```json'
-            echo "$PUBLISHED"
-            echo '```'
+            if [ -n "$PUBLISHED" ]; then
+              echo '```json'
+              echo "$PUBLISHED"
+              echo '```'
+            else
+              echo 'No packages — the image version moved.'
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       # The published image is `Dockerfile`'s final stage: the base plus the profile baked from the
@@ -108,12 +155,11 @@ jobs:
           context: .
           platforms: linux/amd64
           push: true
-          tags: |
-            ghcr.io/devockr/idsh:latest
-            ghcr.io/devockr/idsh:sha-${{ github.sha }}
+          tags: ${{ steps.tags.outputs.tags }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ needs.release.outputs.version }}
           # The image is attested the way the packages are.
           provenance: true
           sbom: true
