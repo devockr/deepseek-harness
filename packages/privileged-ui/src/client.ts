@@ -1,4 +1,4 @@
-// The whole trick, in one property.
+// The whole trick, in one property — and one check before granting it.
 //
 // dsh computes `ctx.connection.isLoopback` from the page's own authority and refuses
 // to be convinced otherwise — upstream puts it plainly: "Only a shell that assembles
@@ -12,6 +12,12 @@
 // build time; this does the same thing at runtime, in the browser, where the flag
 // lives — installable, visible, and removable without touching dsh.
 //
+// It grants the surface only to a page this deployment actually serves: loopback, the
+// listener's own bind literal, or an authority the host declared (`dsh web
+// --trusted-host`, i.e. `DSH_TRUSTED_HOSTS`). dsh's fence around its own `/api` accepts
+// exactly that set, so this follows it instead of privileging whoever can load the page.
+// The verdict comes from the host half, because the browser cannot judge it: /idsh/trusted.
+//
 // This is deliberately an exception to a designed boundary. Read the package README
 // before installing it.
 globalThis.__ModuleLoader__.load({
@@ -22,6 +28,9 @@ globalThis.__ModuleLoader__.load({
     Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' })
 
     const MARK = 'idshPrivileged'
+
+    /** Set when this plugin is disposed, and read again before the flag is written. */
+    let disposed = false
 
     // A one-glance marker and a console line: the image's build-time patch fails the
     // build when dsh moves, and a runtime patch has to fail just as loudly instead of
@@ -38,7 +47,55 @@ globalThis.__ModuleLoader__.load({
     // service it did not inject — that throw is what made the first version inactive.
     exports.inject = ['connection', 'remote']
 
+    /**
+     * Whether this deployment serves the page that is asking. The host answers it — see
+     * ./index — with the same fence dsh runs for its own /api, so loopback forms, IPv6,
+     * default ports and the declared authorities are all judged in one place, not here.
+     */
+    async function mayBePrivileged(): Promise<boolean> {
+      try {
+        const response = await fetch('/idsh/trusted', {
+          headers: { accept: 'application/json' },
+        })
+        if (!response.ok) {
+          return false
+        }
+        const body = (await response.json()) as { trusted?: unknown }
+        return body.trusted === true
+      } catch {
+        return false
+      }
+    }
+
     function apply(ctx: PluginContext): void {
+      // A disposal while the list is in flight must not leave the flag written with no handler to
+      // undo it: `grant` writes before it registers its effect, so a call after disposal would set
+      // the flag and then be refused the teardown. Nothing awaits between the check below and the
+      // write, so the flag cannot slip through once this is set.
+      ctx.effect(() => () => {
+        disposed = true
+      })
+      void mayBePrivileged().then(allowed => {
+        if (disposed) {
+          return
+        }
+        if (!allowed) {
+          mark('SELF-CHECK-FAILED not-a-served-authority:' + location.host)
+          return
+        }
+        grant(ctx)
+      })
+    }
+
+    /**
+     * The half that writes the flag. Split from `apply` so the decision above can be
+     * asynchronous — the list it needs is a request — while this stays exactly what it
+     * was: a synchronous write, reported, and undone on disposal.
+     */
+    function grant(ctx: PluginContext): void {
+      if (disposed) {
+        return
+      }
       // The one place this package reaches past the published client types, and it is the point of
       // the package: dsh's `Context` does not declare `connection` or `remote` for client plugins,
       // and it declares the flag `readonly` on the host side, because a served page is not supposed

@@ -1,5 +1,5 @@
 ---
-description: 'Re-enable the loopback-only privileged surface for a dsh Web profile served to a non-loopback origin — the deliberate security exception the self-hosted image carried as a build-time patch.'
+description: 'Re-enable the loopback-only privileged surface for a dsh Web profile served to a non-loopback origin, for the authorities the deployment declares — the deliberate security exception the self-hosted image carried as a build-time patch.'
 kind: 'package-bundle'
 ---
 
@@ -32,6 +32,12 @@ deliberate boundary, not a feature of dsh.** Install it only where you would
 otherwise have patched dsh's own JavaScript — that is, on a single-tenant,
 self-hosted deployment you control, behind whatever network control you already
 rely on. It is not a substitute for authentication.
+
+It grants the flag only to a page this deployment actually serves: loopback, the listener's own
+bind address, or an authority named by `--trusted-host` / `DSH_TRUSTED_HOSTS` — the same set
+dsh's own `/api` fence accepts. A page reached by a name nobody declared keeps the privileged
+surface off, and `document.body.dataset.idshPrivileged` reads
+`SELF-CHECK-FAILED origin-not-declared:<host>` instead of a granted state.
 
 ## What it does
 
