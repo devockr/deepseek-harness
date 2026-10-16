@@ -91,6 +91,13 @@ const HOME_EXISTED =
   ))
 const SHOTS = process.env.PROBE_SHOTS ?? '/home/app/.dsh/cache/ui-probe'
 const PROFILE = process.env.PROBE_PROFILE ?? 'probe'
+// Every use of it is a path component under PROFILES, and the --bare cleanup deletes that tree, so
+// a value that is anything but a single directory name is refused rather than joined onto a path.
+if (!/^\w[\w.-]*$/.test(PROFILE)) {
+  throw new Error(
+    `PROBE_PROFILE must be a single directory name, not ${JSON.stringify(PROFILE)}`,
+  )
+}
 const HOST = values('--host')[0] ?? '127.0.0.1'
 const INSTALLS = values('--install')
 /**
