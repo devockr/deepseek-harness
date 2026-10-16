@@ -177,6 +177,19 @@ Observe the running thing; do not reason from source.
 - New workspace package → `pnpm install --force`, and drop `node_modules/.pnpm/lock.yaml` plus
   `.pnpm-workspace-state-v1.json` if the importer is skipped.
 
+## Releasing and CI
+
+- **Every action is pinned to a full commit SHA with its release tag in a trailing comment**
+  (`uses: actions/checkout@<sha> # v7.0.1`): a tag can be moved, a SHA cannot.
+- A change to a package under `packages/` needs a changeset (`.changeset/`). The `Release` workflow
+  folds those into one version PR and publishes it with `pnpm release` — `changeset publish`, which
+  runs each package's `prepack`, so the tarball it uploads always carries a fresh `lib/`.
+- **CI installs the pnpm version the `Dockerfile` pins** (`pnpm/action-setup`, explicit `version`):
+  bump both together, because Renovate only reads the Dockerfile one.
+- `autofix.yml` fixes formatting and autofixable lint on pull requests, and has to keep the name
+  `autofix.ci`; `pkg-pr-new.yml` runs `pkg-pr-new` from the lockfile, never `pnpm dlx`, which that
+  project asks CI not to use.
+
 ## Pull requests
 
 - Target `main`; a stacked PR uses the branch below as its base, and GitHub retargets it on merge.
