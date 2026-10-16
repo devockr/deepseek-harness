@@ -23,9 +23,10 @@ interface RouteResponse {
 }
 
 interface HostContext {
-  webServer?: { register(route: unknown): unknown }
+  webServer?: { register(route: unknown): (() => void) | void }
   get(name: string): unknown
   inject(names: string[], callback: (ctx: HostContext) => void): void
+  effect(body: () => (() => void) | void): void
 }
 
 /**
@@ -80,13 +81,15 @@ export function apply(ctx: HostContext): void {
   ctx.inject(['webServer'], ctx => {
     const { webServer } = ctx
     if (webServer !== undefined) {
-      webServer.register({
-        kind: 'exact',
-        path: trustedHostsPath,
-        handler: (request: RouteRequest, response: RouteResponse) => {
-          answer(request, response, ctx)
-        },
-      })
+      ctx.effect(() =>
+        webServer.register({
+          kind: 'exact',
+          path: trustedHostsPath,
+          handler: (request: RouteRequest, response: RouteResponse) => {
+            answer(request, response, ctx)
+          },
+        }),
+      )
     }
   })
 }

@@ -29,6 +29,9 @@ globalThis.__ModuleLoader__.load({
 
     const MARK = 'idshPrivileged'
 
+    /** Set when this plugin is disposed, and read again before the flag is written. */
+    let disposed = false
+
     // A one-glance marker and a console line: the image's build-time patch fails the
     // build when dsh moves, and a runtime patch has to fail just as loudly instead of
     // rotting quietly. `document.body.dataset.idshPrivileged` is the whole report.
@@ -99,7 +102,17 @@ globalThis.__ModuleLoader__.load({
     }
 
     function apply(ctx: PluginContext): void {
+      // A disposal while the list is in flight must not leave the flag written with no handler to
+      // undo it: `grant` writes before it registers its effect, so a call after disposal would set
+      // the flag and then be refused the teardown. Nothing awaits between the check below and the
+      // write, so the flag cannot slip through once this is set.
+      ctx.effect(() => () => {
+        disposed = true
+      })
       void mayBePrivileged().then(allowed => {
+        if (disposed) {
+          return
+        }
         if (!allowed) {
           mark('SELF-CHECK-FAILED origin-not-declared:' + location.host)
           return
@@ -114,6 +127,9 @@ globalThis.__ModuleLoader__.load({
      * was: a synchronous write, reported, and undone on disposal.
      */
     function grant(ctx: PluginContext): void {
+      if (disposed) {
+        return
+      }
       // The one place this package reaches past the published client types, and it is the point of
       // the package: dsh's `Context` does not declare `connection` or `remote` for client plugins,
       // and it declares the flag `readonly` on the host side, because a served page is not supposed
