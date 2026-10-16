@@ -5,7 +5,7 @@
   "description": "Re-enable the loopback-only privileged surface (settings page, durable settings persistence) for a dsh Web profile served to a non-loopback origin — the deliberate exception the self-hosted image used to carry as a build-time patch",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/devockr/deepseek-harness.git",
+    "url": "git+https://github.com/devockr/idsh.git",
     "directory": "packages/privileged-ui"
   },
   "license": "MIT",

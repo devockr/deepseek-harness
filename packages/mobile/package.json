@@ -5,7 +5,7 @@
   "description": "The touch-device half of a dsh Web profile: coarse-pointer CSS, Enter inserting a line break instead of sending, and an iOS home-screen icon — the things the self-hosted image carried as build-time patches",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/devockr/deepseek-harness.git",
+    "url": "git+https://github.com/devockr/idsh.git",
     "directory": "packages/mobile"
   },
   "license": "MIT",
