@@ -107,8 +107,11 @@ workflow collect every pending changeset into one "Version Packages" pull reques
 **that** publishes the bumped packages to npm. The `version` field in a package's manifest is an
 output of that flow, not something to edit by hand.
 
-What the images bake is a later step: [Renovate](renovate.json) raises the `dsh plugin …` lines in
-`Dockerfile` to the published versions.
+What the images bake moves with that release: `pnpm version` runs
+[`tools/sync-image-pins.mts`](tools/sync-image-pins.mts), so the version pull request bumps the
+`dsh plugin …` lines in `Dockerfile` to the versions it is releasing. Once they are on npm, the same
+workflow builds the published image and pushes it to `ghcr.io/devockr/idsh` (`:latest`, and
+`:sha-<commit>`), so a deployment can pull it instead of building.
 
 ## Notes
 

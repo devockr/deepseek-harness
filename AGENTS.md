@@ -193,6 +193,16 @@ Observe the running thing; do not reason from source.
   to use the lockfile in CI, to keep a preview-only tool out of the workspace dependencies.
 - **Only `ci.yml` pins Node lines**: a matrix of 24 (what the images run) and 26 (the oldest line
   `engines` allows). Every other workflow runs `lts/*`, because none of them decides what ships.
+- **The `Dockerfile` pins ride changesets' version lifecycle**: `pnpm version` runs
+  `tools/sync-image-pins.mts`, so the version pull request bumps the `dsh plugin …` lines with the
+  manifests — never by hand. The script only moves the version and keeps each line's shape, because
+  `renovate.json`'s second custom manager still reads those lines.
+- **The image is published from the action's own publish result.** `release.yml` exposes the
+  changesets action's `published` and `published-packages`, and its `image` job runs only on
+  `published == 'true'`: it pushes `Dockerfile`'s final stage — not `:base`, which is a stage — to
+  `ghcr.io/devockr/idsh` as `:latest` and `:sha-<commit>`, for `linux/amd64`. A change that publishes
+  no package therefore does not rebuild the published image: an `entrypoint.sh` or `Dockerfile` fix
+  reaches it with the next release.
 
 ## Pull requests
 

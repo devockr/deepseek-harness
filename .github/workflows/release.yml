@@ -22,6 +22,12 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
+    # What the image job waits on — changesets' own publish result, not a rule of ours: `published`
+    # is `'true'` only on the push that put packages on npm, the same push that leaves `main`
+    # naming the versions `Dockerfile` installs.
+    outputs:
+      published: ${{ steps.changesets.outputs.published }}
+      published-packages: ${{ steps.changesets.outputs.published-packages }}
     steps:
       - name: Checkout Repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -52,3 +58,64 @@ jobs:
           # `prepack`, so a published tarball always carries a fresh `lib/`.
           publish-script: pnpm release
           version-script: pnpm run version
+
+  image:
+    name: Publish the image
+    needs: release
+    # Changesets decides this, through its own publish result: the versions `Dockerfile` installs are
+    # the ones the version pull request bumped, so the image can only be built once that release has
+    # published them.
+    if: needs.release.outputs.published == 'true'
+    runs-on: ubuntu-latest
+    # The workflow's permissions are the release job's; this one reads the repository and writes its
+    # own package.
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Record the published packages
+        env:
+          PUBLISHED: ${{ needs.release.outputs.published-packages }}
+        run: |
+          {
+            echo '### Published by this release'
+            echo '```json'
+            echo "$PUBLISHED"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # The published image is `Dockerfile`'s final stage: the base plus the profile baked from the
+      # registry. `:base` is a stage for this image and the dev one, not an image of its own.
+      # linux/amd64 is the architecture of the deployments; add `,linux/arm64` when one needs it.
+      - name: Build and push
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/devockr/idsh:latest
+            ghcr.io/devockr/idsh:sha-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          # The image is attested the way the packages are.
+          provenance: true
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
