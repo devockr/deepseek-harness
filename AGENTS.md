@@ -191,6 +191,8 @@ Observe the running thing; do not reason from source.
 - `autofix.yml` fixes formatting and autofixable lint on pull requests, and has to keep the name
   `autofix.ci`; `pkg-pr-new.yml` runs `pkg-pr-new` through `pnpm dlx`, against that project's advice
   to use the lockfile in CI, to keep a preview-only tool out of the workspace dependencies.
+- **Only `ci.yml` pins Node lines**: a matrix of 24 (what the images run) and 26 (the oldest line
+  `engines` allows). Every other workflow runs `lts/*`, because none of them decides what ships.
 
 ## Pull requests
 
