@@ -1,4 +1,4 @@
-// The whole trick, in one property.
+// The whole trick, in one property — and one check before granting it.
 //
 // dsh computes `ctx.connection.isLoopback` from the page's own authority and refuses
 // to be convinced otherwise — upstream puts it plainly: "Only a shell that assembles
@@ -11,6 +11,12 @@
 // surface anyway. The image used to get it by patching dsh's installed JavaScript at
 // build time; this does the same thing at runtime, in the browser, where the flag
 // lives — installable, visible, and removable without touching dsh.
+//
+// It grants the surface only to a page this deployment actually serves: loopback, the
+// listener's own bind literal, or an authority the host declared (`dsh web
+// --trusted-host`, i.e. `DSH_TRUSTED_HOSTS`). dsh's fence around its own `/api` accepts
+// exactly that set, so this follows it instead of privileging whoever can load the page.
+// The list comes from the host half, because the browser cannot see it: /idsh/trusted-hosts.
 //
 // This is deliberately an exception to a designed boundary. Read the package README
 // before installing it.
@@ -38,7 +44,76 @@ globalThis.__ModuleLoader__.load({
     // service it did not inject — that throw is what made the first version inactive.
     exports.inject = ['connection', 'remote']
 
+    /**
+     * Whether a page authority is one of `entries`, by the rule dsh's own fence uses: a
+     * declared authority without a port matches any port, one with a port matches exactly.
+     */
+    function authorityMatches(host: string, entries: string[]): boolean {
+      const mine = host.toLowerCase()
+      const name = mine.replace(/:\d+$/, '')
+      return entries.some(entry => {
+        const candidate = entry.toLowerCase()
+        return candidate.includes(':') ? candidate === mine : candidate === name
+      })
+    }
+
+    /** The authorities this deployment serves, plus its listener's own literal. */
+    async function servedAuthorities(): Promise<string[]> {
+      const response = await fetch('/idsh/trusted-hosts', {
+        headers: { accept: 'application/json' },
+      })
+      if (!response.ok) {
+        return []
+      }
+      const body = (await response.json()) as {
+        trustedHosts?: unknown
+        bindHosts?: unknown
+      }
+      const asList = (value: unknown): string[] =>
+        Array.isArray(value)
+          ? value.filter((entry): entry is string => typeof entry === 'string')
+          : []
+      return [...asList(body.trustedHosts), ...asList(body.bindHosts)]
+    }
+
+    /**
+     * True when this page may carry the privileged surface. Loopback needs no round trip;
+     * anything else has to be named by the deployment. A failure to read the list grants
+     * nothing, which keeps an unreachable host half on the safe side of the boundary.
+     */
+    async function mayBePrivileged(): Promise<boolean> {
+      const name = location.hostname.toLowerCase()
+      if (
+        name === '127.0.0.1' ||
+        name === '::1' ||
+        name === 'localhost' ||
+        name.endsWith('.localhost')
+      ) {
+        return true
+      }
+      try {
+        return authorityMatches(location.host, await servedAuthorities())
+      } catch {
+        return false
+      }
+    }
+
     function apply(ctx: PluginContext): void {
+      void mayBePrivileged().then(allowed => {
+        if (!allowed) {
+          mark('SELF-CHECK-FAILED origin-not-declared:' + location.host)
+          return
+        }
+        grant(ctx)
+      })
+    }
+
+    /**
+     * The half that writes the flag. Split from `apply` so the decision above can be
+     * asynchronous — the list it needs is a request — while this stays exactly what it
+     * was: a synchronous write, reported, and undone on disposal.
+     */
+    function grant(ctx: PluginContext): void {
       // The one place this package reaches past the published client types, and it is the point of
       // the package: dsh's `Context` does not declare `connection` or `remote` for client plugins,
       // and it declares the flag `readonly` on the host side, because a served page is not supposed
