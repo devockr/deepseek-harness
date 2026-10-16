@@ -25,6 +25,9 @@ jobs:
     steps:
       - name: Checkout Repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes, and everything after the install runs dependency code.
+          persist-credentials: false
 
       # Before setup-node: its `cache: pnpm` needs pnpm on PATH to ask for the store directory.
       - name: Setup pnpm
