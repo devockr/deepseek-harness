@@ -7,7 +7,9 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # A publish that has started has to finish: cancelling it can leave some packages on npm and the
+  # rest not.
+  cancel-in-progress: false
 
 # `id-token` is what npm's trusted publishing uses, so publishing needs no NPM_TOKEN; `contents`
 # and `pull-requests` are what the version commit and the "Version Packages" pull request need.
