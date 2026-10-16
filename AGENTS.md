@@ -205,10 +205,12 @@ Observe the running thing; do not reason from source.
   action's `published` and `published-packages`, and reads `released`/`version` from
   `image/package.json` against `github.event.before` — an image-only release publishes nothing, so
   `published` alone cannot trigger it. The `image` job pushes `Dockerfile`'s final stage — not
-  `:base`, which is a stage — to `ghcr.io/devockr/idsh` as `:latest`, `:sha-<commit>` and, when the
-  version moved, `:<version>`, for `linux/amd64`. A change that neither publishes a package nor moves
-  the version does not rebuild the published image: an `entrypoint.sh` fix reaches it with the next
-  release.
+  `:base`, which is a stage — to `ghcr.io/devockr/idsh` and `docker.io/devockr/idsh`, as `:latest`,
+  `:sha-<commit>` and, when the version moved, `:<version>`, for `linux/amd64`. Docker Hub needs
+  `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` (an access token, not the account password), and both
+  logins run before the build, so a missing one fails the job rather than leaving one registry a
+  release behind the other. A change that neither publishes a package nor moves the version does not
+  rebuild the published image: an `entrypoint.sh` fix reaches it with the next release.
 
 ## Pull requests
 

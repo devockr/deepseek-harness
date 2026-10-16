@@ -110,8 +110,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # A Docker Hub access token, not the account password, in `DOCKERHUB_TOKEN`. Both logins happen
+      # before the build on purpose: a missing one fails the job, rather than leaving one registry a
+      # release behind the other.
+      - name: Log in to Docker Hub
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       # `latest` and the commit always; the version only when this release moved it, so a version tag
-      # is never rewritten by a release that did not.
+      # is never rewritten by a release that did not. Both registries carry the same set.
       - name: Work out the tags
         id: tags
         env:
@@ -119,11 +129,13 @@ jobs:
           RELEASED: ${{ needs.release.outputs.released }}
         run: |
           {
-            echo 'ghcr.io/devockr/idsh:latest'
-            echo "ghcr.io/devockr/idsh:sha-${GITHUB_SHA}"
-            if [ "$RELEASED" = 'true' ]; then
-              echo "ghcr.io/devockr/idsh:${VERSION}"
-            fi
+            for image in ghcr.io/devockr/idsh docker.io/devockr/idsh; do
+              echo "$image:latest"
+              echo "$image:sha-${GITHUB_SHA}"
+              if [ "$RELEASED" = 'true' ]; then
+                echo "$image:${VERSION}"
+              fi
+            done
           } > "$RUNNER_TEMP/tags"
           {
             echo 'tags<<TAGS'
