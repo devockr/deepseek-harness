@@ -16,7 +16,7 @@
 // listener's own bind literal, or an authority the host declared (`dsh web
 // --trusted-host`, i.e. `DSH_TRUSTED_HOSTS`). dsh's fence around its own `/api` accepts
 // exactly that set, so this follows it instead of privileging whoever can load the page.
-// The list comes from the host half, because the browser cannot see it: /idsh/trusted-hosts.
+// The verdict comes from the host half, because the browser cannot judge it: /idsh/trusted.
 //
 // This is deliberately an exception to a designed boundary. Read the package README
 // before installing it.
@@ -48,54 +48,20 @@ globalThis.__ModuleLoader__.load({
     exports.inject = ['connection', 'remote']
 
     /**
-     * Whether a page authority is one of `entries`, by the rule dsh's own fence uses: a
-     * declared authority without a port matches any port, one with a port matches exactly.
-     */
-    function authorityMatches(host: string, entries: string[]): boolean {
-      const mine = host.toLowerCase()
-      const name = mine.replace(/:\d+$/, '')
-      return entries.some(entry => {
-        const candidate = entry.toLowerCase()
-        return candidate.includes(':') ? candidate === mine : candidate === name
-      })
-    }
-
-    /** The authorities this deployment serves, plus its listener's own literal. */
-    async function servedAuthorities(): Promise<string[]> {
-      const response = await fetch('/idsh/trusted-hosts', {
-        headers: { accept: 'application/json' },
-      })
-      if (!response.ok) {
-        return []
-      }
-      const body = (await response.json()) as {
-        trustedHosts?: unknown
-        bindHosts?: unknown
-      }
-      const asList = (value: unknown): string[] =>
-        Array.isArray(value)
-          ? value.filter((entry): entry is string => typeof entry === 'string')
-          : []
-      return [...asList(body.trustedHosts), ...asList(body.bindHosts)]
-    }
-
-    /**
-     * True when this page may carry the privileged surface. Loopback needs no round trip;
-     * anything else has to be named by the deployment. A failure to read the list grants
-     * nothing, which keeps an unreachable host half on the safe side of the boundary.
+     * Whether this deployment serves the page that is asking. The host answers it — see
+     * ./index — with the same fence dsh runs for its own /api, so loopback forms, IPv6,
+     * default ports and the declared authorities are all judged in one place, not here.
      */
     async function mayBePrivileged(): Promise<boolean> {
-      const name = location.hostname.toLowerCase()
-      if (
-        name === '127.0.0.1' ||
-        name === '::1' ||
-        name === 'localhost' ||
-        name.endsWith('.localhost')
-      ) {
-        return true
-      }
       try {
-        return authorityMatches(location.host, await servedAuthorities())
+        const response = await fetch('/idsh/trusted', {
+          headers: { accept: 'application/json' },
+        })
+        if (!response.ok) {
+          return false
+        }
+        const body = (await response.json()) as { trusted?: unknown }
+        return body.trusted === true
       } catch {
         return false
       }
@@ -114,7 +80,7 @@ globalThis.__ModuleLoader__.load({
           return
         }
         if (!allowed) {
-          mark('SELF-CHECK-FAILED origin-not-declared:' + location.host)
+          mark('SELF-CHECK-FAILED not-a-served-authority:' + location.host)
           return
         }
         grant(ctx)
