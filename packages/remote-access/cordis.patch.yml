@@ -9,12 +9,12 @@
 - id: webserver
   name: '@deepseek-ai/dsh-host-webserver'
   config:
-    # Take the address whatever layer set it: the entrypoint passes `--host`, and this
-    # bundle leaves the choice alone when nothing did, so the row keeps dsh's shipped
-    # 127.0.0.1. It used to fall back to 0.0.0.0 for the releases that accepted the
-    # wildcard from a config layer; from 0.2.1-alpha.2 that value is refused wherever it
-    # comes from, so a fallback could only ever fail.
-    host: !!js ctx.webStartup.host
+    # Shipped default: 127.0.0.1. Binding an address another machine can reach is what
+    # makes the Web UI usable from elsewhere. Up to 0.2.1-alpha.1 that had to come from a
+    # config layer, since only the command line refused `--host 0.0.0.0`; from
+    # 0.2.1-alpha.2 the value is validated wherever it comes from and one concrete literal
+    # is all that is accepted, so the fallback below only applies to the older releases.
+    host: !!js ctx.webStartup.host ?? '0.0.0.0'
     port: !!js ctx.webStartup.port ?? 3080
     compression: gzip
     compressionLevel: 1
