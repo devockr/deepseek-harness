@@ -229,6 +229,14 @@ function reportBaked(inherited: string[]) {
 /** The probe profile: created from the shipped web template, never the live one. */
 async function prepareProfile() {
   await fs.mkdir(HOME, { recursive: true })
+  // `--bare` has to mean an empty profile even when an earlier run left one behind: the probe
+  // reuses PROBE_HOME, so without this a bare run would boot whatever that run installed.
+  if (BARE) {
+    await fs.rm(path.join(HOME, 'profiles', PROFILE), {
+      recursive: true,
+      force: true,
+    })
+  }
   // Idempotent: a crashed earlier run leaves the profile behind, and recreating it is
   // an error rather than a no-op.
   const profileManifest = path.join(HOME, 'profiles', PROFILE, 'package.json')
