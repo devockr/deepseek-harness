@@ -4,12 +4,12 @@
   "description": "Companion dsh plugins for the container image in this repository",
   "license": "MIT",
   "private": true,
+  "packageManager": "pnpm@12.11.2",
   "engines": {
     "node": ">=24"
   },
   "scripts": {
     "build": "pnpm --recursive --if-present --workspace-concurrency=1 run build",
-    "changeset": "changeset",
     "deploy:dev": "pnpm dev && node tools/deploy-dev.ts",
     "deploy:dev:dry": "node tools/deploy-dev.ts --dry",
     "dev": "pnpm build && docker build --target base -t deepseek-harness-dsh:base . && docker build -f Dockerfile.dev -t deepseek-harness-dsh:dev .",
@@ -31,7 +31,6 @@
     "@types/node": "^26.6.5",
     "@typescript/native": "npm:typescript@^7.0.2",
     "eslint": "^10.12.0",
-    "pkg-pr-new": "^0.0.90",
     "playwright": "^1.64.0",
     "prettier": "^3.9.10",
     "typed-query-selector": "^2.12.3",
