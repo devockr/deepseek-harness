@@ -184,11 +184,13 @@ Observe the running thing; do not reason from source.
 - A change to a package under `packages/` needs a changeset (`.changeset/`). The `Release` workflow
   folds those into one version PR and publishes it with `pnpm release` — `changeset publish`, which
   runs each package's `prepack`, so the tarball it uploads always carries a fresh `lib/`.
-- **CI installs the pnpm version the `Dockerfile` pins** (`pnpm/action-setup`, explicit `version`):
-  bump both together, because Renovate only reads the Dockerfile one.
+- **pnpm is pinned once, in `packageManager`**, which `pnpm/action-setup` reads — no `version:` in a
+  workflow. The `Dockerfile`'s `npm install -g pnpm@…` carries the same number and Renovate keeps
+  both current, so bump them together. It also gives `pnpm-lock.yaml` a second document (the `pnpm`
+  package and its `@pnpm/exe` set): that is pnpm 12 recording the managed version, not damage.
 - `autofix.yml` fixes formatting and autofixable lint on pull requests, and has to keep the name
-  `autofix.ci`; `pkg-pr-new.yml` runs `pkg-pr-new` from the lockfile, never `pnpm dlx`, which that
-  project asks CI not to use.
+  `autofix.ci`; `pkg-pr-new.yml` runs `pkg-pr-new` through `pnpm dlx`, against that project's advice
+  to use the lockfile in CI, to keep a preview-only tool out of the workspace dependencies.
 
 ## Pull requests
 
