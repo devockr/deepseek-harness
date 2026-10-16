@@ -1,5 +1,5 @@
 {
-  "name": "deepseek-harness-plugins",
+  "name": "idsh",
   "type": "module",
   "description": "Companion dsh plugins for the container image in this repository",
   "license": "MIT",
