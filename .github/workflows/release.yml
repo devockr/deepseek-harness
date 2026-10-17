@@ -191,20 +191,6 @@ jobs:
       # registry. `:base` is a stage for this image and the dev one, not an image of its own.
       # One manifest list for both architectures the deployments use; the arm64 half runs under QEMU,
       # so it is the slow half of the build.
-      # Docker Hub's Overview is not read from the image — the OCI labels above only fill the
-      # sidebar. It has to be pushed to the Hub's API, or the page says "README not available"
-      # however good the image is. That is one page per repository, shared by every tag.
-      #
-      # The script is in tools/ rather than here: shell quoting around JSON and a JWT is the kind of
-      # thing that is only ever tested in production. It authenticates, and nothing about the README
-      # depends on the image, so it runs before the build — a wrong token fails in seconds instead of
-      # after a twenty-minute multi-arch build that has already pushed its tags.
-      - name: Push the README to Docker Hub
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: node tools/push-hub-readme.mts
-
       - name: Build and push
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:

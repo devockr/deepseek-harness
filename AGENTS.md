@@ -182,8 +182,8 @@ Observe the running thing; do not reason from source.
 ## Scripts under `tools/`
 
 - **`tools/` itself holds what ships or what CI runs**: the release and check scripts
-  (`sync-image-pins.mts`, `check-image-changesets.mts`, `check-peer-ranges.mts`,
-  `push-hub-readme.mts`), the shared `image-pins.mts` and `types.d.ts`, and
+  (`sync-image-pins.mts`, `check-image-changesets.mts`, `check-peer-ranges.mts`), the shared
+  `image-pins.mts` and `types.d.ts`, and
   `sync-companions.mts` — the one script `entrypoint.sh` runs at boot, which the `Dockerfile`
   copies by name so that everything else here stays out of the image.
 - **`tools/dev/` is for local development only** — `deploy-dev.ts`, `ui-probe.mts` — nothing in
@@ -223,10 +223,13 @@ Observe the running thing; do not reason from source.
   that changes what the image bakes has to bump it in **one** of its changesets — changesets applies
   the whole set at once, so one bump covers the release; `tools/check-image-changesets.mts` (run by
   `ci.yml`) enforces the same rule on the only set it can see, one pull request, which is stricter
-  than the release. That version is the only thing that releases the image: `release.yml` reads it
-  against `github.event.before` and gates the `image` job on it. The changesets action's
-  `published`/`published-packages` are exposed for the job summary but cannot be the trigger — a
-  private package publishes nothing.
+  than the release. That version is the only thing that releases the image, and `release.yml` decides
+  by asking the registry: one step reads `image/package.json` and looks the tag up through Docker
+  Hub's tag API — 200 published, 404 not, anything else fails the step — once the changesets action
+  reports `has-changesets == 'false'`. A diff against `github.event.before` cannot answer that: the
+  same commit may be re-run, and a failed attempt leaves the version unchanged, which is how `0.0.3`
+  was skipped once. The action's `published`/`published-packages` are exposed for the job summary but
+  cannot be the trigger — a private package publishes nothing.
 - **The image job publishes `Dockerfile`'s final stage** — not `:base`, which is a stage — to
   `ghcr.io/devockr/idsh` and `docker.io/devockr/idsh` as `:latest`, `:sha-<commit>` and `:<version>`.
   It is a multi-arch manifest list for `linux/amd64` and `linux/arm64`: the base pin is a manifest-list
@@ -241,6 +244,13 @@ Observe the running thing; do not reason from source.
   platform. `release.yml` keeps both on (`provenance: true`, `sbom: true`) — they record which
   commit and workflow produced a digest, though nothing here signs them. Do not turn them off to tidy
   the page.
+- **The Hub page is maintained by hand, on purpose.** Docker Hub's Overview changes only through its
+  REST API, and that API grants repository metadata writes to tokens carrying Read, Write _and_
+  Delete — measured: Read and Write alone answer 403 `insufficient scope`, and "Allow Cloud
+  Sandboxes access" makes no difference. Those permissions are account-wide and a token that can
+  delete repositories has no business in CI, so nothing here automates the page: it is a short,
+  Hub-specific text pasted into the settings page, not `README.md`. The OCI labels keep the sidebar
+  correct without any credential.
 - **Docker Hub needs `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`** (an access token, not the account
   password); both registry logins run before the build, so a missing one fails the job rather than
   leaving one registry a release behind the other. A change that moves neither a package nor the image
