@@ -30,8 +30,14 @@ else
   # Re-point the image's pre-created `app` account at the host uid/gid. `-o` allows
   # the non-unique case where another account already owns that id (node=1000, or
   # users=100 for the group), so no branching is needed — the linuxserver.io idiom.
+  #
+  # The uid is written into /etc/passwd rather than through `usermod -u`, which chowns
+  # the account's home directory recursively: /home/app holds the state directory
+  # (11 GB, 139k inodes) plus whatever a deployment mounts beside it, and that walk cost
+  # six minutes on every start. Anything that actually needs fixing is fixed
+  # non-recursively further down.
   groupmod -o -g "$PGID" app
-  usermod -o -u "$PUID" -g "$PGID" -d /home/app -s /bin/bash app
+  sed -i "s|^app:x:[0-9]*:[0-9]*:|app:x:$PUID:$PGID:|" /etc/passwd
 
   # `-o` can leave two accounts sharing a uid: app + node when PUID=1000, which is
   # the most common uid on Linux — so this is the *likely* case for anyone reusing
