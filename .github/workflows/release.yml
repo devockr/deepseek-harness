@@ -26,11 +26,13 @@ jobs:
       id-token: write
       pull-requests: write
     # `published`/`published-packages` are the action's npm result, reported in the job summary.
-    # Whether the image needs building is the `image-tag` job's question, and it reads the version
-    # itself: `image/` is private, so an image-only release publishes nothing to npm.
+    # `version` is the image's own version, read from the tree this job already checked out: `image/`
+    # is private, so an image-only release publishes nothing to npm, and whether that version needs
+    # building is the `image-tag` job's question — it needs the number, not the tree.
     outputs:
       published: ${{ steps.changesets.outputs.published }}
       published-packages: ${{ steps.changesets.outputs.published-packages }}
+      version: ${{ steps.image-version.outputs.version }}
     steps:
       - name: Checkout Repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -50,6 +52,10 @@ jobs:
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Read the image version this release carries
+        id: image-version
+        run: echo "version=$(jq -r .version image/package.json)" >> "$GITHUB_OUTPUT"
 
       - name: Create Release Pull Request or Publish to npm
         id: changesets
@@ -71,26 +77,22 @@ jobs:
     # after the version moved" and "several commits landed at once" — none of which a diff against
     # the previous commit can.
     #
-    # Docker Hub, anonymously: the repository is public, so no login is involved. That is also the
-    # registry a deployment pulls from, which makes it the one that matters.
+    # Docker Hub, anonymously: the repository is public, so no login is involved, and it is the
+    # registry a deployment pulls from. No checkout either — the version comes from the release job,
+    # so this job is one request.
+    if: needs.release.outputs.version != ''
     runs-on: ubuntu-latest
     permissions:
       contents: read
     outputs:
       publish: ${{ steps.check.outputs.publish }}
-      version: ${{ steps.check.outputs.version }}
     steps:
-      - name: Checkout Repo
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
       - id: check
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
         run: |
           set -euo pipefail
-          version=$(jq -r .version image/package.json)
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          reference="docker.io/devockr/idsh:$version"
+          reference="docker.io/devockr/idsh:${VERSION}"
           if docker manifest inspect "$reference" > /dev/null 2>&1; then
             echo "publish=false" >> "$GITHUB_OUTPUT"
             echo "$reference is already published"
