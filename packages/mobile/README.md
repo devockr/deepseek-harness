@@ -1,8 +1,3 @@
----
-description: 'The touch-device half of the Web UI as a client plugin: coarse-pointer CSS, Enter inserting a line break instead of sending, and an iOS home-screen icon.'
-kind: 'package-bundle'
----
-
 # @idsh/mobile
 
 ## Summary
@@ -81,7 +76,7 @@ Both fixes are also confirmed on a real iPhone: the home-screen shortcut shows t
 with the white glyph, a plain Enter in the composer inserts a line break instead of sending,
 and a plain Enter still reaches the session-search input untouched.
 
-`node tools/ui-probe.mts --scenario mobile` asserts all of it: the plain Enter never reaches
+`node tools/dev/ui-probe.mts --scenario mobile` asserts all of it: the plain Enter never reaches
 the document (`enterEvents: []`), both `contenteditable` spellings are sent
 `insertLineBreak` (`insertedBreaks`), the session-search input keeps its own Enter, and a
 regression on any of those lands in `failures` — checked by pointing the scenario at a build

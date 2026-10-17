@@ -10,7 +10,7 @@
  * not re-download it.
  *
  * Usage:
- *   node tools/ui-probe.mts [--install <pnpm-spec>]... [--bare] [--host <host>] [--keep] [--shot <name>]
+ *   node tools/dev/ui-probe.mts [--install <pnpm-spec>]... [--bare] [--host <host>] [--keep] [--shot <name>]
  *
  * --install     add a package to the probe profile before booting (repeatable); a spec whose
  *               package is already there replaces it

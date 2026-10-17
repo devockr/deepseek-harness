@@ -1,8 +1,3 @@
----
-description: 'Re-enable the loopback-only privileged surface for a dsh Web profile served to a non-loopback origin, for the authorities the deployment declares — the deliberate security exception the self-hosted image carried as a build-time patch.'
-kind: 'package-bundle'
----
-
 # @idsh/privileged-ui
 
 ## Read this first

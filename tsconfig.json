@@ -11,5 +11,5 @@
     "allowImportingTsExtensions": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["tools"]
+  "include": ["tools", "vite.config.ts"]
 }

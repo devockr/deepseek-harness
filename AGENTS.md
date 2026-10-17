@@ -53,7 +53,7 @@ naming a public mirror here leaks nothing.
   settings, which are a state-directory path and a public mirror and hold nothing personal.
 - **Each image has its own ignore file**: `.dockerignore` for `Dockerfile` (which copies
   `entrypoint.sh` and the one tool the entrypoint runs, `tools/sync-companions.mts`),
-  `Dockerfile.dev.dockerignore` for the dev image (`packages/` and `tools/`, plus the Dockerfile
+  `Dockerfile.dev.dockerignore` for the dev image (`packages/` and `tools/dev/`, plus the Dockerfile
   itself, which BuildKit reads from the context). Neither build carries the other's
   content, and a new `COPY` has to be whitelisted in the right one or the build fails loudly.
 - **The `@deepseek-ai/dsh@…`/`pnpm@…` pins and the plugins baked into the images** are read by the
@@ -179,6 +179,24 @@ Observe the running thing; do not reason from source.
 - New workspace package → `pnpm install --force`, and drop `node_modules/.pnpm/lock.yaml` plus
   `.pnpm-workspace-state-v1.json` if the importer is skipped.
 
+## Scripts under `tools/`
+
+- **`tools/` itself holds what ships or what CI runs**: the release and check scripts
+  (`sync-image-pins.mts`, `check-image-changesets.mts`, `check-peer-ranges.mts`,
+  `push-hub-readme.mts`), the shared `image-pins.mts` and `types.d.ts`, and
+  `sync-companions.mts` — the one script `entrypoint.sh` runs at boot, which the `Dockerfile`
+  copies by name so that everything else here stays out of the image.
+- **`tools/dev/` is for local development only** — `deploy-dev.ts`, `ui-probe.mts` — nothing in
+  there runs in CI or ships. A directory of its own, rather than a per-file convention, because the
+  rule is who runs it, and that is a property of the whole set.
+
+## Docs site
+
+- `pnpm docs:dev` / `pnpm docs:build` render `README.md` and each package's `CHANGELOG.md` as a
+  small site (`docs/`, `index.html`, `vite.config.ts`). It has no content of its own: the Markdown
+  files are the source, and `dist/` is build output and gitignored. `@vitejs/plugin-react` is used
+  rather than the SWC one because `@swc/core` needs a build script, which `allowBuilds` refuses.
+
 ## Releasing and CI
 
 - **Every action is pinned to a full commit SHA with its release tag in a trailing comment**
@@ -215,6 +233,14 @@ Observe the running thing; do not reason from source.
   digest, which is what lets one `FROM` resolve per platform, and the arm64 half runs under QEMU on an
   amd64 runner — the slow half, which is what the job's `timeout-minutes` is for.
   `node-addon-require-builtin` ships `linux-arm64-gnu` prebuilds, so dsh installs there.
+- **The release build installs from the official registry**, not the mirror the Dockerfiles default to
+  for local builds: `release.yml` passes `NPM_REGISTRY=https://registry.npmjs.org/` as a build
+  argument. A mirror is for a slow network, not for the thing that publishes.
+- **The `unknown/unknown` rows on the package page are the attestations**, not a broken build:
+  `buildx` writes provenance and the SBOM into the same manifest list as entries that carry no real
+  platform. `release.yml` keeps both on (`provenance: true`, `sbom: true`) — they record which
+  commit and workflow produced a digest, though nothing here signs them. Do not turn them off to tidy
+  the page.
 - **Docker Hub needs `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`** (an access token, not the account
   password); both registry logins run before the build, so a missing one fails the job rather than
   leaving one registry a release behind the other. A change that moves neither a package nor the image
