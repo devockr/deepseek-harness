@@ -124,8 +124,8 @@ unset NPM_REGISTRY
 # bind-mount point. The mounts are owned by whoever owns them on the host, and
 # this image is published for arbitrary mount layouts, so we can't assume their
 # names — `mountpoint` detects them instead. The skeleton files (.bashrc & co)
-# are what this fixes: after `usermod -u` they're left at the old build-time uid,
-# and the running user should be able to read/write them.
+# are what this fixes: they can still carry the build-time uid, and the running user should be
+# able to read/write them.
 #
 # /home/app and /app themselves are always ours — a non-recursive chown cannot
 # reach into the mounts below /home/app — so they go first and unconditionally.
@@ -137,8 +137,14 @@ for f in /home/app/* /home/app/.[!.]*; do
   chown "$PUID:$PGID" "$f" 2> /dev/null || true
 done
 
+# The state directory is a bind mount, so the loop above skips it — and this one file has to be
+# readable by the uid dsh drops to. It is named here on purpose: anything recursive would walk the
+# 11 GB of cache beside it on every start, which is the whole reason `usermod -u` is gone.
 CRED="$HOME/.dsh/.credentials.yaml"
-[ -f "$CRED" ] && chmod 600 "$CRED"
+if [ -f "$CRED" ]; then
+  chown "$PUID:$PGID" "$CRED" 2> /dev/null || true
+  chmod 600 "$CRED"
+fi
 
 # @idsh/remote-access describes the reachability rules in its own README; with it absent — a
 # profile that never had it, or one where it was removed — dsh keeps its shipped loopback bind.
