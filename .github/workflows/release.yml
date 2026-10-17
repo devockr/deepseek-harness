@@ -72,8 +72,12 @@ jobs:
       # One step, two answers: the version this release carries, and whether the registry already has
       # it. Asking the registry is what `changeset publish` does with npm — it answers "the same commit
       # was re-run", "the previous attempt failed after the version moved" and "several commits landed
-      # at once", none of which a diff against the previous commit can. Docker Hub anonymously: the
-      # repository is public, and it is the registry a deployment pulls from.
+      # at once", none of which a diff against the previous commit can.
+      #
+      # The tag API rather than `docker manifest inspect`, because the status is the answer: 200 means
+      # published, 404 means not, and anything else is an outage or a rate limit, which fails the step.
+      # `manifest inspect` exits non-zero for all three, so a broken registry would look like a version
+      # that needs building.
       - name: Read the image version and whether it is published
         id: image-version
         if: steps.changesets.outputs.has-changesets == 'false'
@@ -81,14 +85,22 @@ jobs:
           set -euo pipefail
           version=$(jq -r .version image/package.json)
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          reference="docker.io/devockr/idsh:$version"
-          if docker manifest inspect "$reference" > /dev/null 2>&1; then
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-            echo "$reference is already published"
-          else
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-            echo "$reference is not published yet"
-          fi
+          tag="https://hub.docker.com/v2/namespaces/devockr/repositories/idsh/tags/$version"
+          status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 "$tag")
+          case "$status" in
+            200)
+              echo "publish=false" >> "$GITHUB_OUTPUT"
+              echo "devockr/idsh:$version is already published"
+              ;;
+            404)
+              echo "publish=true" >> "$GITHUB_OUTPUT"
+              echo "devockr/idsh:$version is not published yet"
+              ;;
+            *)
+              echo "Docker Hub answered $status for devockr/idsh:$version" >&2
+              exit 1
+              ;;
+          esac
 
   image:
     name: Publish the image
