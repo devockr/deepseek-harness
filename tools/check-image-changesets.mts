@@ -52,7 +52,12 @@ const namedIn = (source: string): string[] => {
   const [, front = ''] = /^---\r?\n([\s\S]*?)\r?\n---/.exec(source) ?? []
   const names: string[] = []
   for (const line of front.split('\n')) {
-    const match = /^"(?<name>[^"]+)": (?:major|minor|patch)$/u.exec(line.trim())
+    // `changeset add` writes double quotes; a changeset written by hand often arrives with single
+    // ones, and YAML does not care which — so a check that only understood one of them would quietly
+    // ignore exactly the changesets a person wrote.
+    const match = /^["'](?<name>[^"']+)["']: (?:major|minor|patch)$/u.exec(
+      line.trim(),
+    )
     const name = match?.groups?.name
     if (name) {
       names.push(name)

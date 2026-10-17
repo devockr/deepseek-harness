@@ -1,7 +1,7 @@
 # glibc base (not Alpine): dsh 0.2.x depends on node-addon-require-builtin, whose
 # prebuilt binaries are published for linux-*-gnu only — there is no musl build,
 # so Alpine fails at boot with "No usable native binding found".
-FROM node:24.21.0-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20 AS base
+FROM node:24.22.0-bookworm-slim@sha256:a5f4366e834695d5f363b920c104953a535d3a9864d1bdf74566a0ebe01daee5 AS base
 
 # Create the account dsh runs as. Its uid/gid here are placeholders only: the
 # real ones arrive at runtime as PUID/PGID and entrypoint.sh re-points this
@@ -59,7 +59,7 @@ RUN --mount=type=cache,id=apt_cache,target=/var/cache/apt,sharing=locked \
 ARG NPM_REGISTRY=https://registry.npmmirror.com/
 
 RUN --mount=type=cache,id=npm_cache,target=/root/.npm \
-  npm install -g --registry="$NPM_REGISTRY" @deepseek-ai/dsh@0.2.1-alpha.4 pnpm@12.11.2
+  npm install -g --registry="$NPM_REGISTRY" @deepseek-ai/dsh@0.2.1-rc.1 pnpm@12.14.0
 
 # This image used to patch dsh's installed JavaScript here: the loopback gate the
 # settings page hides behind, the touch CSS, the home-screen icon, and the composer's
