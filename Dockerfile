@@ -30,8 +30,8 @@ RUN groupadd app && useradd -m -g app -s /bin/bash app
 # Browser libraries for browser-driven checks are deliberately *not* here: they are ~14MB of
 # shared libraries for a tool the deployment never runs. They live in Dockerfile.dev, which is
 # built from this file's `base` target and tagged separately (see "Images" in AGENTS.md):
-#   docker build --target base -t deepseek-harness-dsh:base .
-#   docker build -f Dockerfile.dev -t deepseek-harness-dsh:dev .
+#   docker build --target base -t devockr/idsh:base .
+#   docker build -f Dockerfile.dev -t devockr/idsh:dev .
 # Named caches, like npm_cache: the archives and lists persist across builds, and a cache mount
 # is not part of the layer — which is why the cleanup that used to follow is gone instead of
 # moved: it would empty the cache on every build.

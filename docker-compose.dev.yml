@@ -8,7 +8,7 @@ services:
     # Built only by `pnpm dev`, which rebuilds :base first. Never built or pulled from here:
     # building the overlay would let a stale :base into a :dev that looks freshly built, and a
     # missing image would silently come from a registry instead of failing.
-    image: deepseek-harness-dsh:dev
+    image: devockr/idsh:dev
     pull_policy: never
     build: !reset null
     environment:

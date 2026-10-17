@@ -62,11 +62,11 @@ naming a public mirror here leaks nothing.
 
 ## Images
 
-| tag                           | contents                                                      | used by                              |
-| ----------------------------- | ------------------------------------------------------------- | ------------------------------------ |
-| `deepseek-harness-dsh:base`   | dsh + pnpm, nothing baked, no browser libraries               | the two images below                 |
-| `deepseek-harness-dsh:latest` | `:base` + a profile baked from the registry (strict)          | the deployment                       |
-| `deepseek-harness-dsh:dev`    | `:base` + those libraries; the profile baked from `packages/` | local runs and browser-driven checks |
+| tag                   | contents                                                      | used by                              |
+| --------------------- | ------------------------------------------------------------- | ------------------------------------ |
+| `devockr/idsh:base`   | dsh + pnpm, nothing baked, no browser libraries               | the two images below                 |
+| `devockr/idsh:latest` | `:base` + a profile baked from the registry (strict)          | the deployment                       |
+| `devockr/idsh:dev`    | `:base` + those libraries; the profile baked from `packages/` | local runs and browser-driven checks |
 
 Build the dev image with `pnpm dev`: it compiles the packages (`pnpm build`), then builds `:base`
 and then `:dev` — in that order, and both orders are the point. `:base` carries `tools/` and
@@ -75,7 +75,7 @@ that looks fresh; and the compiled `lib/` is what dsh loads, so `Dockerfile.dev`
 that has none — or whose `src/` is newer than its `lib/`, which is what a forgotten rebuild
 looks like — rather than shipping one that cannot load, or is stale. `prepack` runs the same
 build on publish. The dev overlay does not build anything: it selects
-`image: deepseek-harness-dsh:dev`, refuses to pull, and resets the base service's `build`, so
+`image: devockr/idsh:dev`, refuses to pull, and resets the base service's `build`, so
 `pnpm dev` stays the only path to `:dev`, and a stale `:base` cannot end up in a `:dev` that looks
 freshly built. It needs Compose 2.24.4+ for `!reset`; an older one fails at parse time rather than
 building the wrong image.

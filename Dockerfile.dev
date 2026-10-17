@@ -18,7 +18,7 @@
 #
 #   docker run --rm --network container:dsh --volumes-from dsh --user "$UID:$GID" \
 #     --entrypoint node -v "$PWD:/checkout" -w /checkout \
-#     deepseek-harness-dsh:dev <check>.mjs
+#     devockr/idsh:dev <check>.mjs
 #
 # The browser itself is in neither image: it lives in the mounted cache
 # (~/.dsh/cache/ms-playwright), populated once with `pnpm exec playwright install`.
@@ -39,7 +39,7 @@
 # configuration are here because Skia aborts the renderer the first time a page shapes text,
 # which is every page. Headed runs would need the X/GTK set and an X server as well; nothing
 # here installs one.
-ARG BASE=deepseek-harness-dsh:base
+ARG BASE=devockr/idsh:base
 FROM ${BASE}
 
 # An ARG before FROM is only usable in the FROM line, so the registry has to be declared again.
