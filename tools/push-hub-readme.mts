@@ -33,20 +33,22 @@ const fail = (message: string): never => {
 }
 
 /**
- * What the JWT the login handed back is actually allowed to do. A token with the read scope only
- * authenticates and then gets `insufficient scope` from the PATCH, which reads like a permission
- * problem on the namespace and is usually the token's own setting.
+ * Which account the JWT the login handed back belongs to, and what it is allowed to do. The account
+ * matters as much as the scopes: the secret in CI is not necessarily the token that was tried
+ * locally, and "no scopes" says nothing about which one answered.
  */
-const scopesOf = (jwt: string): string => {
+const claimsOf = (jwt: string): string => {
   const [, payload = ''] = jwt.split('.')
   try {
     const claims = JSON.parse(
       Buffer.from(payload, 'base64url').toString('utf8'),
     ) as {
       access?: Array<{ type?: string; actions?: string[] }>
+      username?: string
     }
     const actions = (claims.access ?? []).flatMap(entry => entry.actions ?? [])
-    return actions.length === 0 ? 'no scopes' : actions.join(', ')
+    const scopes = actions.length === 0 ? 'no scopes' : actions.join(', ')
+    return `user ${claims.username ?? '(unnamed)'}, scopes ${scopes}`
   } catch {
     return 'unreadable token'
   }
@@ -105,11 +107,11 @@ await call(API, {
   headers: { Authorization: `Bearer ${jwt}` },
   body,
 }).catch((error: unknown) => {
-  // The two failures worth naming: a token that authenticates but cannot write, and an account
-  // without write access to the namespace.
+  // A token that authenticates but cannot write: the account it belongs to says which of the two
+  // possible causes it is — the token's own scope, or that account's role in the namespace.
   if (error instanceof Error && error.message.includes('insufficient scope')) {
     fail(
-      `the token authenticated but cannot write (scopes: ${scopesOf(jwt)}) — Docker Hub access tokens are read-only unless "Read & Write" was chosen, and the account needs write access to ${NAMESPACE}`,
+      `the token authenticated but cannot write (${claimsOf(jwt)}) — either the token lacks the write scope, or that account has no write access to ${NAMESPACE}`,
     )
   }
   throw error
