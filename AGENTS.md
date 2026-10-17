@@ -223,10 +223,13 @@ Observe the running thing; do not reason from source.
   that changes what the image bakes has to bump it in **one** of its changesets — changesets applies
   the whole set at once, so one bump covers the release; `tools/check-image-changesets.mts` (run by
   `ci.yml`) enforces the same rule on the only set it can see, one pull request, which is stricter
-  than the release. That version is the only thing that releases the image: `release.yml` reads it
-  against `github.event.before` and gates the `image` job on it. The changesets action's
-  `published`/`published-packages` are exposed for the job summary but cannot be the trigger — a
-  private package publishes nothing.
+  than the release. That version is the only thing that releases the image, and `release.yml` decides
+  by asking the registry: one step reads `image/package.json` and looks the tag up through Docker
+  Hub's tag API — 200 published, 404 not, anything else fails the step — once the changesets action
+  reports `has-changesets == 'false'`. A diff against `github.event.before` cannot answer that: the
+  same commit may be re-run, and a failed attempt leaves the version unchanged, which is how `0.0.3`
+  was skipped once. The action's `published`/`published-packages` are exposed for the job summary but
+  cannot be the trigger — a private package publishes nothing.
 - **The image job publishes `Dockerfile`'s final stage** — not `:base`, which is a stage — to
   `ghcr.io/devockr/idsh` and `docker.io/devockr/idsh` as `:latest`, `:sha-<commit>` and `:<version>`.
   It is a multi-arch manifest list for `linux/amd64` and `linux/arm64`: the base pin is a manifest-list
@@ -241,11 +244,12 @@ Observe the running thing; do not reason from source.
   platform. `release.yml` keeps both on (`provenance: true`, `sbom: true`) — they record which
   commit and workflow produced a digest, though nothing here signs them. Do not turn them off to tidy
   the page.
-- **The Docker Hub token needs Read, Write _and_ Delete.** The Hub grants repository metadata
-  writes (the README step) only to tokens carrying all three; Read and Write alone answer 403
-  `insufficient scope`, and "Allow Cloud Sandboxes access" makes no difference. Those permissions are
-  account-wide, so a token leaked out of CI can delete any repository that account can write. If that
-  blast radius matters, give CI its own account with access to `idsh` alone — the code needs no change.
+- **The Docker Hub token needs Read, Write _and_ Delete.** Measured twice on the same account:
+  Read and Write alone answer 403 `insufficient scope` from the metadata PATCH, Read, Write and
+  Delete answer 200, and "Allow Cloud Sandboxes access" makes no difference. The JWT is opaque — it
+  carries neither `username` nor `access` — so the response is the only way to tell.
+  Those permissions are account-wide, so a token taken out of CI can delete anything that account can
+  write. A dedicated account with access to `idsh` alone would bound that; it has not been set up.
 - **Docker Hub needs `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`** (an access token, not the account
   password); both registry logins run before the build, so a missing one fails the job rather than
   leaving one registry a release behind the other. A change that moves neither a package nor the image
