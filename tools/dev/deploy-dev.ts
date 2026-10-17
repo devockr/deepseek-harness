@@ -18,7 +18,7 @@ import { promisify } from 'node:util'
 
 const execFileAsync = promisify(execFile)
 // tools/dev/ — three levels up is the checkout, which is where the compose files are.
-const repo = fileURLToPath(new URL('../../../', import.meta.url))
+const repo = fileURLToPath(new URL('../../', import.meta.url))
 const dry = process.argv.includes('--dry')
 
 const die = (message: string): never => {
