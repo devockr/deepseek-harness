@@ -146,9 +146,14 @@ done
 # The state directory is a bind mount, so the loop above skips it — and this one file has to be
 # readable by the uid dsh drops to. It is named here on purpose: anything recursive would walk
 # everything cached beside it on every start, which is the whole reason `usermod -u` is gone.
+#
+# Both `chown` and `chmod` follow a symlink named on the command line, so a link planted in the
+# mounted directory — to /etc/shadow, say — would hand that file to PUID and then widen it back to
+# 0600 for its new owner. Only a regular file is touched, and `-h` keeps the change on the link if
+# one appears between the test and the call.
 CRED="$HOME/.dsh/.credentials.yaml"
-if [ -f "$CRED" ]; then
-  chown "$PUID:$PGID" "$CRED" 2> /dev/null || true
+if [ -f "$CRED" ] && [ ! -L "$CRED" ]; then
+  chown -h "$PUID:$PGID" "$CRED" 2> /dev/null || true
   chmod 600 "$CRED"
 fi
 
