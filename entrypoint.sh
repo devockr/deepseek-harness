@@ -30,8 +30,23 @@ else
   # Re-point the image's pre-created `app` account at the host uid/gid. `-o` allows
   # the non-unique case where another account already owns that id (node=1000, or
   # users=100 for the group), so no branching is needed — the linuxserver.io idiom.
+  #
+  # The uid is written into /etc/passwd rather than through `usermod -u`, which chowns the
+  # account's home directory recursively: /home/app holds the state directory and whatever a
+  # deployment mounts beside it. Walking all of that before the first line of output delays the
+  # boot by however long the disk takes. Anything that actually needs fixing is fixed
+  # non-recursively further down.
   groupmod -o -g "$PGID" app
-  usermod -o -u "$PUID" -g "$PGID" -d /home/app -s /bin/bash app
+  # `sed -i` writes a copy and renames it, which can carry the copy's mode over: /etc/passwd
+  # has to stay 0644 or every non-root lookup fails.
+  sed -i "s|^app:x:[0-9]*:[0-9]*:|app:x:$PUID:$PGID:|" /etc/passwd
+  chmod 0644 /etc/passwd
+  # A pattern that stopped matching would leave the image's build-time uid in place and run the
+  # whole container as the wrong user, silently — the account lookup is the cheap way to tell.
+  if [ "$(id -u app)" != "$PUID" ]; then
+    echo "entrypoint: app is still uid $(id -u app), not $PUID" >&2
+    exit 1
+  fi
 
   # `-o` can leave two accounts sharing a uid: app + node when PUID=1000, which is
   # the most common uid on Linux — so this is the *likely* case for anyone reusing
@@ -115,21 +130,39 @@ unset NPM_REGISTRY
 # bind-mount point. The mounts are owned by whoever owns them on the host, and
 # this image is published for arbitrary mount layouts, so we can't assume their
 # names — `mountpoint` detects them instead. The skeleton files (.bashrc & co)
-# are what this fixes: after `usermod -u` they're left at the old build-time uid,
-# and the running user should be able to read/write them.
+# are what this fixes: they can still carry the build-time uid, and the running user should be
+# able to read/write them.
 #
 # /home/app and /app themselves are always ours — a non-recursive chown cannot
 # reach into the mounts below /home/app — so they go first and unconditionally.
-chown "$PUID:$PGID" /home/app /app 2> /dev/null || true
+#
+# `-h` everywhere: a symlink named on the command line is followed, and these entries live in a
+# mounted directory where a link to /etc/shadow would be handed to PUID. `chown -R` below does not
+# follow links and needs no flag.
+chown -h "$PUID:$PGID" /home/app /app 2> /dev/null || true
 
 for f in /home/app/* /home/app/.[!.]*; do
   [ -e "$f" ] || continue
   mountpoint -q "$f" && continue
-  chown "$PUID:$PGID" "$f" 2> /dev/null || true
+  chown -h "$PUID:$PGID" "$f" 2> /dev/null || true
 done
 
+# The state directory is a bind mount, so the loop above skips it — and this one file has to be
+# readable by the uid dsh drops to. It is named here on purpose: anything recursive would walk
+# everything cached beside it on every start, which is the whole reason `usermod -u` is gone.
+#
+# A symlink is an error rather than something to resolve: `chown` and `chmod` follow one named on the
+# command line, so a link planted in a mounted directory (to /etc/shadow, say) would be handed to PUID
+# — and a link is not a shape this file is meant to have.
 CRED="$HOME/.dsh/.credentials.yaml"
-[ -f "$CRED" ] && chmod 600 "$CRED"
+if [ -L "$CRED" ]; then
+  echo "entrypoint: $CRED is a symlink; it must be a regular file" >&2
+  exit 1
+fi
+if [ -f "$CRED" ]; then
+  chown "$PUID:$PGID" "$CRED" 2> /dev/null || true
+  chmod 600 "$CRED"
+fi
 
 # @idsh/remote-access describes the reachability rules in its own README; with it absent — a
 # profile that never had it, or one where it was removed — dsh keeps its shipped loopback bind.
