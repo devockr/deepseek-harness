@@ -18,22 +18,20 @@ import { isPluginLine, pinsIn } from './image-pins.mts'
 
 const repo = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 
-/** A manifest's package name, which is all this check reads from one. */
-const nameOf = async (file: string): Promise<string | undefined> => {
-  const manifest = JSON.parse(await fs.readFile(file, 'utf8')) as {
-    name?: string
-  }
-  return manifest.name
-}
-
 const fail = (message: string): never => {
   console.error(`check-image-changesets: ${message}`)
   process.exit(1)
 }
 
+/** The image's own name, which is the only thing this check reads from its manifest. */
 const image =
-  (await nameOf(path.join(repo, 'image/package.json'))) ??
-  fail('image/package.json has no name')
+  (
+    JSON.parse(
+      await fs.readFile(path.join(repo, 'image/package.json'), 'utf8'),
+    ) as {
+      name?: string
+    }
+  ).name ?? fail('image/package.json has no name')
 
 /** The packages the image bakes: the pins its Dockerfile installs, and nothing else. */
 const baked = new Set<string>()
