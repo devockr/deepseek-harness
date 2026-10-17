@@ -241,6 +241,11 @@ Observe the running thing; do not reason from source.
   platform. `release.yml` keeps both on (`provenance: true`, `sbom: true`) — they record which
   commit and workflow produced a digest, though nothing here signs them. Do not turn them off to tidy
   the page.
+- **The Docker Hub token needs Read, Write _and_ Delete.** The Hub grants repository metadata
+  writes (the README step) only to tokens carrying all three; Read and Write alone answer 403
+  `insufficient scope`, and "Allow Cloud Sandboxes access" makes no difference. Those permissions are
+  account-wide, so a token leaked out of CI can delete any repository that account can write. If that
+  blast radius matters, give CI its own account with access to `idsh` alone — the code needs no change.
 - **Docker Hub needs `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`** (an access token, not the account
   password); both registry logins run before the build, so a missing one fails the job rather than
   leaving one registry a release behind the other. A change that moves neither a package nor the image
