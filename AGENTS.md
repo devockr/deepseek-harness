@@ -53,7 +53,7 @@ naming a public mirror here leaks nothing.
   settings, which are a state-directory path and a public mirror and hold nothing personal.
 - **Each image has its own ignore file**: `.dockerignore` for `Dockerfile` (which copies
   `entrypoint.sh` and the one tool the entrypoint runs, `tools/image/sync-companions.mts`),
-  `Dockerfile.dev.dockerignore` for the dev image (`packages/` and `tools/`, plus the Dockerfile
+  `Dockerfile.dev.dockerignore` for the dev image (`packages/` and `tools/dev/`, plus the Dockerfile
   itself, which BuildKit reads from the context). Neither build carries the other's
   content, and a new `COPY` has to be whitelisted in the right one or the build fails loudly.
 - **The `@deepseek-ai/dsh@…`/`pnpm@…` pins and the plugins baked into the images** are read by the
