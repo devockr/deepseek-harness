@@ -1,8 +1,3 @@
----
-description: "Reach a dsh Web profile from another machine: bind every interface and keep the UI's Remote-mux WebSocket alive across a flaky or proxied link."
-kind: 'package-bundle'
----
-
 # @idsh/remote-access
 
 ## Summary

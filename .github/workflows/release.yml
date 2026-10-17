@@ -190,8 +190,9 @@ jobs:
           # The image is attested the way the packages are. Both attestations land in
           # this tag's manifest list as extra entries with no real platform, which is
           # why the package page shows "unknown/unknown" rows beside amd64 and arm64 —
-          # that is the attestation itself, not a broken build, and it is what verifies
-          # which commit and workflow produced a digest.
+          # that is the attestation itself, not a broken build. They record the source
+          # revision and the builder run; they do not verify the workflow's identity,
+          # which would take a signed artifact attestation this workflow does not do.
           provenance: true
           sbom: true
           cache-from: type=gha

@@ -1,8 +1,3 @@
----
-description: 'The touch-device half of the Web UI as a client plugin: coarse-pointer CSS, Enter inserting a line break instead of sending, and an iOS home-screen icon.'
-kind: 'package-bundle'
----
-
 # @idsh/mobile
 
 ## Summary
