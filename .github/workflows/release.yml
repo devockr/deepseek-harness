@@ -33,6 +33,7 @@ jobs:
       published: ${{ steps.changesets.outputs.published }}
       published-packages: ${{ steps.changesets.outputs.published-packages }}
       version: ${{ steps.image-version.outputs.version }}
+      publish: ${{ steps.image-version.outputs.publish }}
     steps:
       - name: Checkout Repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -91,7 +92,7 @@ jobs:
     # Only when the registry does not already carry this version — `ci.yml` makes sure a changeset
     # that changes what the image bakes moves it. By this point the packages `Dockerfile` names are
     # on the registry, which is what the build that installs them needs.
-    if: needs.image-tag.outputs.publish == 'true'
+    if: needs.release.outputs.publish == 'true'
     runs-on: ubuntu-latest
     # The arm64 half is emulated, so this is minutes of apt, npm and `dsh plugin add`; a build that
     # deadlocks under QEMU should fail rather than sit on the default six-hour budget.
@@ -137,7 +138,7 @@ jobs:
       - name: Work out the tags
         id: tags
         env:
-          VERSION: ${{ needs.image-tag.outputs.version }}
+          VERSION: ${{ needs.release.outputs.version }}
         run: |
           {
             for image in ghcr.io/devockr/idsh docker.io/devockr/idsh; do
@@ -202,7 +203,7 @@ jobs:
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ needs.image-tag.outputs.version }}
+            org.opencontainers.image.version=${{ needs.release.outputs.version }}
             org.opencontainers.image.title=idsh
             org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.documentation=${{ github.server_url }}/${{ github.repository }}#readme
