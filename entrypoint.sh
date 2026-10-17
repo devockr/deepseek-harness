@@ -32,8 +32,8 @@ else
   # users=100 for the group), so no branching is needed — the linuxserver.io idiom.
   #
   # The uid is written into /etc/passwd rather than through `usermod -u`, which chowns
-  # the account's home directory recursively: /home/app holds the state directory
-  # deployment mounts beside it, and walking all of that before the first line of output delays
+  # account's home directory recursively: /home/app holds the state directory and whatever a
+  # deployment mounts beside it. Walking all of that before the first line of output delays
   # the boot by however long the disk takes. Anything that actually needs fixing is fixed
   # non-recursively further down.
   groupmod -o -g "$PGID" app
