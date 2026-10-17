@@ -72,7 +72,7 @@ COPY --chmod=755 entrypoint.sh /entrypoint.sh
 # — the probe, the deploy tool, the checks — part of this stage, so adding one invalidated the npm
 # install above and the browser libraries the dev image adds on top of it. Everything else under
 # tools/ belongs to the dev image, which copies the directory itself.
-COPY --chmod=755 tools/sync-companions.mts /opt/dsh/tools/sync-companions.mts
+COPY --chmod=755 tools/image/sync-companions.mts /opt/dsh/tools/sync-companions.mts
 
 # Deliberately no USER here: the container starts as root so entrypoint.sh can
 # re-point `app` to PUID/PGID and fix ownership, then it drops to that uid with
