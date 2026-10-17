@@ -437,7 +437,7 @@ if (flag('--no-browser')) {
         ...html.matchAll(
           /["']((?:plugins|\/plugins)\/[^"']+client\.js[^"']*)["']/g,
         ),
-      ].map(m => m[1].replaceAll('&amp;', '&').replaceAll('&quot;', '"')),
+      ].map(m => m[1].replaceAll('&quot;', '"').replaceAll('&amp;', '&')),
     ),
   ]
   process.stdout.write(`bundle urls : ${urls.length}\n`)
