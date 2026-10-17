@@ -52,6 +52,7 @@
     "typed-query-selector": "^2.12.3",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
     "typescript-eslint": "^8.71.2",
-    "vite": "^8.3.4"
+    "vite": "^8.3.4",
+    "x-fetch": "^0.3.0"
   }
 }

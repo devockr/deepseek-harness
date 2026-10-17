@@ -14,15 +14,28 @@
  */
 import fs from 'node:fs/promises'
 
+import { isXFetchError, xfetch } from 'x-fetch'
+
 const NAMESPACE = 'devockr'
 const REPOSITORY = 'idsh'
 const SHORT = 'Dockerized DeepSeek Harness (dsh) web UI'
+const API = `https://hub.docker.com/v2/repositories/${NAMESPACE}/${REPOSITORY}/`
 
 const dryRun = process.argv.includes('--dry-run')
 
 const fail = (message: string): never => {
   console.error(`push-hub-readme: ${message}`)
   process.exit(1)
+}
+
+/** `xfetch` throws on a non-2xx response, so the message has to carry what the API said. */
+const describe = (error: unknown): string => {
+  if (isXFetchError(error)) {
+    const status = error.response?.status
+    const data = error.data == null ? '' : ` ${JSON.stringify(error.data)}`
+    return status === undefined ? error.message : `${String(status)}${data}`
+  }
+  return error instanceof Error ? error.message : String(error)
 }
 
 const readme = await fs.readFile('README.md', 'utf8')
@@ -39,37 +52,24 @@ const username =
   process.env.DOCKERHUB_USERNAME ?? fail('DOCKERHUB_USERNAME is not set')
 const token = process.env.DOCKERHUB_TOKEN ?? fail('DOCKERHUB_TOKEN is not set')
 
-const login = await fetch('https://hub.docker.com/v2/users/login/', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ username, password: token }),
-})
+const login = await xfetch<{ token?: string }>(
+  'https://hub.docker.com/v2/users/login/',
+  {
+    method: 'POST',
+    body: { username, password: token },
+  },
+).catch((error: unknown) =>
+  fail(`login failed (${describe(error)}) — the account or the token is wrong`),
+)
 
-if (!login.ok) {
-  fail(
-    `login answered ${String(login.status)} — the account or the token is wrong`,
-  )
-}
-
-const { token: jwt } = (await login.json()) as { token?: string }
-if (!jwt) {
+if (!login.token) {
   fail('login answered without a token')
 }
 
-const patch = await fetch(
-  `https://hub.docker.com/v2/repositories/${NAMESPACE}/${REPOSITORY}/`,
-  {
-    method: 'PATCH',
-    headers: {
-      Authorization: `Bearer ${jwt}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  },
-)
-
-if (!patch.ok) {
-  fail(`PATCH answered ${String(patch.status)}: ${await patch.text()}`)
-}
+await xfetch(API, {
+  method: 'PATCH',
+  headers: { Authorization: `Bearer ${login.token}` },
+  body,
+}).catch((error: unknown) => fail(`PATCH failed (${describe(error)})`))
 
 console.log(`push-hub-readme: ${NAMESPACE}/${REPOSITORY} updated`)
