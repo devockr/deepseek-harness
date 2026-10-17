@@ -95,8 +95,9 @@ if (changes.length > 0 && !bumpsImage) {
             .join(', ')})`,
       ),
       '',
-      `Add \`"${image}": patch\` to one of them. \`release.yml\` publishes the image from that`,
-      'version alone, so without the bump the image is never rebuilt.',
+      `Add \`"${image}"\` to one of them, with the bump the change deserves — \`patch\`,`,
+      '`minor` or `major`. `release.yml` publishes the image from that version alone, so without a',
+      'bump the image is never rebuilt.',
     ].join('\n'),
   )
 }
