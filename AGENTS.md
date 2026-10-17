@@ -206,11 +206,15 @@ Observe the running thing; do not reason from source.
   `image/package.json` against `github.event.before` — an image-only release publishes nothing, so
   `published` alone cannot trigger it. The `image` job pushes `Dockerfile`'s final stage — not
   `:base`, which is a stage — to `ghcr.io/devockr/idsh` and `docker.io/devockr/idsh`, as `:latest`,
-  `:sha-<commit>` and, when the version moved, `:<version>`, for `linux/amd64`. Docker Hub needs
-  `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` (an access token, not the account password), and both
-  logins run before the build, so a missing one fails the job rather than leaving one registry a
-  release behind the other. A change that neither publishes a package nor moves the version does not
-  rebuild the published image: an `entrypoint.sh` fix reaches it with the next release.
+  `:sha-<commit>` and, when the version moved, `:<version>`, as a multi-arch manifest list for
+  `linux/amd64` and `linux/arm64`. The base pin is a manifest-list digest, which is what lets one
+  `FROM` resolve per platform, and the arm64 half runs under QEMU on an amd64 runner — it is the slow
+  half, and `node-addon-require-builtin` ships `linux-arm64-gnu` prebuilds, so dsh installs there.
+  Docker Hub needs `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` (an access token, not the account
+  password), and both logins run before the build, so a missing one fails the job rather than leaving
+  one registry a release behind the other. A change that neither publishes a package nor moves the
+  version does not rebuild the published image: an `entrypoint.sh` fix reaches it with the next
+  release.
 
 ## Pull requests
 
