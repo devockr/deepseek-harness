@@ -199,8 +199,9 @@ Observe the running thing; do not reason from source.
   `renovate.json`'s second custom manager still reads those lines.
 - **The image has a version of its own, in `image/`**: a private package that carries nothing else, so
   changesets bumps it and never publishes it (`privatePackages.version`; npm never sees it). That
-  version is what releases the image, so a changeset whose change reaches the image has to name
-  `@idsh/image` alongside the packages — `ci.yml` refuses one that does not.
+  version is what releases the image, so a release that changes what the image bakes has to bump it
+  in **one** of its changesets — changesets applies the whole set at once, so one bump covers the
+  release, and `ci.yml` refuses a release where none does.
 - **The image is released when its own version moves, and only then.** `release.yml` reads
   `released`/`version` from `image/package.json` against `github.event.before` and gates the `image`
   job on it; the changesets action's `published` and `published-packages` are exposed for the job

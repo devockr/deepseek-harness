@@ -110,10 +110,11 @@ output of that flow, not something to edit by hand.
 What the images bake moves with that release: `pnpm version` runs
 [`tools/sync-image-pins.mts`](tools/sync-image-pins.mts), so the version pull request bumps the
 `dsh plugin …` lines in `Dockerfile` to the versions it is releasing. The image keeps a version of its
-own in [`image/`](image/), a private package that only carries it, and a changeset that changes what
-the image bakes names it too — CI refuses one that does not. When that version moves, the workflow
-builds the image and pushes it to `ghcr.io/devockr/idsh` and to `devockr/idsh` on Docker Hub as
-`:latest`, `:sha-<commit>` and `:<version>`, so a deployment can pull it instead of building.
+own in [`image/`](image/), a private package that only carries it, and a release that changes what
+the image bakes bumps it in one of its changesets — CI refuses a release where none does. When that
+version moves, the workflow builds the image and pushes it to `ghcr.io/devockr/idsh` and to
+`devockr/idsh` on Docker Hub as `:latest`, `:sha-<commit>` and `:<version>`, so a deployment can pull
+it instead of building.
 
 ## Notes
 

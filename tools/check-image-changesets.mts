@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 /**
- * A changeset that changes what the image bakes has to move the image's version, because
- * `release.yml` publishes the image from that version and from nothing else. Without this check a
- * plugin release whose changeset forgot `@idsh/image` would publish packages and quietly ship no
- * image at all: the version would not move, so the job that waits for it would not run.
+ * A release that changes what the image bakes has to move the image's version, because `release.yml`
+ * publishes the image from that version and from nothing else. Without this check such a release
+ * would publish packages and quietly ship no image at all: the version would not move, so the job
+ * that waits for it would not run.
  *
- * The pending changesets are simply the ones in the tree — a release consumes them, so `main` has
- * none and a pull request carries the ones it adds.
+ * One bump is enough. `changeset version` applies every pending changeset at once, so the image only
+ * has to be named somewhere in the release, not in each changeset. The pending changesets are the
+ * ones in the tree — a release consumes them, so `main` has none and a pull request carries the ones
+ * it adds.
  */
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -62,33 +64,45 @@ const namedIn = (source: string): string[] => {
 }
 
 const entries = await fs.readdir(path.join(repo, '.changeset'))
-const changesets = entries.filter(
+const files = entries.filter(
   file => file.endsWith('.md') && file !== 'README.md',
 )
 
-const forgotten: string[] = []
-for (const file of changesets) {
-  const names = namedIn(
-    await fs.readFile(path.join(repo, '.changeset', file), 'utf8'),
-  )
-  const bakedHere = names.filter(name => baked.has(name))
-  if (bakedHere.length > 0 && !names.includes(image)) {
-    forgotten.push(`  .changeset/${file} (${bakedHere.join(', ')})`)
-  }
+const changesets: Array<{ file: string; names: string[] }> = []
+for (const file of files) {
+  changesets.push({
+    file,
+    names: namedIn(
+      await fs.readFile(path.join(repo, '.changeset', file), 'utf8'),
+    ),
+  })
 }
 
-if (forgotten.length > 0) {
+/** The changesets that change a package the image bakes, whichever ones bump the image. */
+const changes = changesets.filter(entry =>
+  entry.names.some(name => baked.has(name)),
+)
+const bumpsImage = changesets.some(entry => entry.names.includes(image))
+
+if (changes.length > 0 && !bumpsImage) {
   fail(
     [
-      `these changesets change what the image bakes without naming ${image}:`,
-      ...forgotten,
+      `this release changes what the image bakes, but no pending changeset bumps ${image}:`,
+      ...changes.map(
+        entry =>
+          `  .changeset/${entry.file} (${entry.names
+            .filter(name => baked.has(name))
+            .join(', ')})`,
+      ),
       '',
-      `Add \`"${image}": patch\` to each. \`release.yml\` publishes the image from that version`,
-      'alone, so without the bump the image is never rebuilt.',
+      `Add \`"${image}": patch\` to one of them. \`release.yml\` publishes the image from that`,
+      'version alone, so without the bump the image is never rebuilt.',
     ].join('\n'),
   )
 }
 
 console.log(
-  `check-image-changesets: ${changesets.length} pending changeset(s), each that changes the image bumps it`,
+  bumpsImage
+    ? `check-image-changesets: ${changesets.length} pending changeset(s), the image version moves with this release`
+    : `check-image-changesets: ${changesets.length} pending changeset(s), nothing the image bakes changes`,
 )
