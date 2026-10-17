@@ -44,3 +44,21 @@ export const rewritePins = (
   line.replaceAll(pinMatcher(), (whole, name: string, version: string) => {
     return pick({ name, version }) ?? whole
   })
+
+/**
+ * The dsh the image installs — `npm install -g … @deepseek-ai/dsh@<version>` — which is part of what
+ * the image bakes just as the plugin pins are: moving it changes what the published image runs, and
+ * the release that does so has to move the image's own version with it.
+ */
+export const isDshLine = (line: string): boolean =>
+  !/^\s*#/.test(line) && /\bnpm\s+install\b[^\n]*@deepseek-ai\/dsh@/.test(line)
+
+/** The dsh pin on one line, when it has one. */
+export const dshPinIn = (line: string): Pin | undefined => {
+  const version = isDshLine(line)
+    ? /@deepseek-ai\/dsh@([^\s@]+)/.exec(line)?.[1]
+    : undefined
+  return version === undefined
+    ? undefined
+    : { name: '@deepseek-ai/dsh', version }
+}
