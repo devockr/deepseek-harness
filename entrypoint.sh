@@ -37,7 +37,10 @@ else
   # six minutes on every start. Anything that actually needs fixing is fixed
   # non-recursively further down.
   groupmod -o -g "$PGID" app
+  # `sed -i` writes a copy and renames it, which can carry the copy's mode over: /etc/passwd
+  # has to stay 0644 or every non-root lookup fails.
   sed -i "s|^app:x:[0-9]*:[0-9]*:|app:x:$PUID:$PGID:|" /etc/passwd
+  chmod 0644 /etc/passwd
 
   # `-o` can leave two accounts sharing a uid: app + node when PUID=1000, which is
   # the most common uid on Linux — so this is the *likely* case for anyone reusing
