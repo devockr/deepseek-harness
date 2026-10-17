@@ -4,7 +4,7 @@
   "description": "Companion dsh plugins for the container image in this repository",
   "license": "MIT",
   "private": true,
-  "packageManager": "pnpm@12.11.2",
+  "packageManager": "pnpm@12.14.0",
   "engines": {
     "node": ">=24"
   },
@@ -24,8 +24,8 @@
     "version": "changeset version && node tools/sync-image-pins.mts && pnpm install --lockfile-only"
   },
   "devDependencies": {
-    "@1stg/eslint-config": "^10.3.2",
-    "@1stg/prettier-config": "^5.4.0",
+    "@1stg/eslint-config": "^11.0.0",
+    "@1stg/prettier-config": "^6.0.0",
     "@changesets/changelog-github": "^1.0.1",
     "@changesets/cli": "^3.0.3",
     "@types/node": "^26.6.5",
