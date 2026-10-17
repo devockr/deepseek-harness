@@ -227,8 +227,9 @@ Observe the running thing; do not reason from source.
   argument. A mirror is for a slow network, not for the thing that publishes.
 - **The `unknown/unknown` rows on the package page are the attestations**, not a broken build:
   `buildx` writes provenance and the SBOM into the same manifest list as entries that carry no real
-  platform. `release.yml` keeps both on (`provenance: true`, `sbom: true`) — they are what proves
-  which commit and workflow produced a digest. Do not turn them off to tidy the page.
+  platform. `release.yml` keeps both on (`provenance: true`, `sbom: true`) — they record which
+  commit and workflow produced a digest, though nothing here signs them. Do not turn them off to tidy
+  the page.
 - **Docker Hub needs `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`** (an access token, not the account
   password); both registry logins run before the build, so a missing one fails the job rather than
   leaving one registry a release behind the other. A change that moves neither a package nor the image

@@ -24,9 +24,9 @@
 
 ## Documentation
 
-This README and the package changelogs are also a small site: `pnpm docs:dev` serves it and
-`pnpm docs:build` writes a static copy to `dist/`. It renders the Markdown as-is — the same
-`README.md` and `packages/*/CHANGELOG.md` you see here — so there is nothing to keep in sync.
+`pnpm docs:dev` serves this README, `CHANGELOG.md`, each package's `README.md` and
+`CHANGELOG.md`, and the image's changelog; `pnpm docs:build` writes a static copy to `dist/`. The
+Markdown files are the source — there is nothing to keep in sync.
 
 ## Requirements
 

@@ -1,10 +1,12 @@
 /// <reference types="vite/client" />
 
-// The site imports Markdown as a module; MDX turns each file into a component, but TypeScript has no
-// built-in declaration for the extension.
+// Markdown is imported as a module (MDX turns each file into a component) and the stylesheet has no
+// types of its own; neither has a declaration in TypeScript.
 declare module '*.md' {
   import type { ComponentType } from 'react'
 
   const Component: ComponentType
   export default Component
 }
+
+declare module 'github-markdown-css' {}
