@@ -172,6 +172,31 @@ jobs:
       # registry. `:base` is a stage for this image and the dev one, not an image of its own.
       # One manifest list for both architectures the deployments use; the arm64 half runs under QEMU,
       # so it is the slow half of the build.
+      # Docker Hub's Overview is not read from the image — the OCI labels above only fill the
+      # sidebar. It has to be pushed to the Hub's API, or the page says "README not available"
+      # however good the image is.
+      #
+      # Two different identifiers: DOCKERHUB_USERNAME is the account whose token this is, and the
+      # repository lives in the devockr namespace. The PATCH authenticates with the short-lived JWT
+      # the login endpoint hands back, not with the token itself.
+      - name: Push the README to Docker Hub
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          jwt=$(curl -sS --fail-with-body -X POST https://hub.docker.com/v2/users/login/ \
+            -H 'Content-Type: application/json' \
+            --data "$(jq -n --arg u "${DOCKERHUB_USERNAME}" --arg p "${DOCKERHUB_TOKEN}" \
+              '{username: $u, password: $p}')" | jq -r .token)
+          [ -n "$jwt" ] && [ "$jwt" != null ] || { echo "no JWT from Docker Hub" >&2; exit 1; }
+          curl --fail-with-body --silent --show-error \
+            -X PATCH "https://hub.docker.com/v2/repositories/devockr/idsh/" \
+            -H "Authorization: Bearer ${jwt}" \
+            -H 'Content-Type: application/json' \
+            --data "$(jq -Rs '{full_description: .}' README.md)" > /dev/null
+          echo "README pushed to hub.docker.com/r/devockr/idsh"
+
       - name: Build and push
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -202,28 +227,3 @@ jobs:
           sbom: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      # Docker Hub's Overview is not read from the image — the OCI labels above only fill the
-      # sidebar. It has to be pushed to the Hub's API, or the page says "README not available"
-      # however good the image is.
-      #
-      # Two different identifiers: DOCKERHUB_USERNAME is the account whose token this is, and the
-      # repository lives in the devockr namespace. The PATCH authenticates with the short-lived JWT
-      # the login endpoint hands back, not with the token itself.
-      - name: Push the README to Docker Hub
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          jwt=$(curl -sS --fail-with-body -X POST https://hub.docker.com/v2/users/login/ \
-            -H 'Content-Type: application/json' \
-            --data "$(jq -n --arg u "${DOCKERHUB_USERNAME}" --arg p "${DOCKERHUB_TOKEN}" \
-              '{username: $u, password: $p}')" | jq -r .token)
-          [ -n "$jwt" ] && [ "$jwt" != null ] || { echo "no JWT from Docker Hub" >&2; exit 1; }
-          curl --fail-with-body --silent --show-error \
-            -X PATCH "https://hub.docker.com/v2/repositories/devockr/idsh/" \
-            -H "Authorization: Bearer ${jwt}" \
-            -H 'Content-Type: application/json' \
-            --data "$(jq -Rs '{full_description: .}' README.md)" > /dev/null
-          echo "README pushed to hub.docker.com/r/devockr/idsh"
