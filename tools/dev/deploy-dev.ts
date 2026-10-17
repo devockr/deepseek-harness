@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 
 const execFileAsync = promisify(execFile)
-// tools/dev/ — three levels up is the checkout, which is where the compose files are.
+// tools/dev/ — two levels up from this file's own directory is the checkout.
 const repo = fileURLToPath(new URL('../../', import.meta.url))
 const dry = process.argv.includes('--dry')
 
