@@ -160,7 +160,7 @@ Observe the running thing; do not reason from source.
 - Patch YAML takes `#` comments only; `//` fails validation and the install rolls back.
 - `link:` dogfoods from source; `file:` copies.
 - An image's plugin set is the `dsh plugin add` line its Dockerfile bakes with: registry versions in
-  `Dockerfile`, `link:` copies from `packages/` in `Dockerfile.dev`. `pnpm version` writes the
+  `Dockerfile`, `link:` copies from `packages/` in `Dockerfile.dev`. `pnpm run version` writes the
   `Dockerfile` versions from the manifests, and the second custom manager in `renovate.json` still
   tracks those lines, for a version published outside this flow.
 - No `dependencies`. `@deepseek-ai/dsh-*` appear as `peerDependencies`, which says which dsh line a
@@ -194,18 +194,20 @@ Observe the running thing; do not reason from source.
   to use the lockfile in CI, to keep a preview-only tool out of the workspace dependencies.
 - **Only `ci.yml` pins Node lines**: a matrix of 24 (what the images run) and 26 (the oldest line
   `engines` allows). Every other workflow runs `lts/*`, because none of them decides what ships.
-- **The `Dockerfile` pins ride changesets' version lifecycle**: `pnpm version` runs
+- **The `Dockerfile` pins ride changesets' version lifecycle**: `pnpm run version` runs
   `tools/sync-image-pins.mts`, so the version pull request bumps the `dsh plugin …` lines with the
-  manifests — never by hand. The script only moves the version and keeps each line's shape, because
-  `renovate.json`'s second custom manager still reads those lines.
+  manifests — never by hand. It has to be `pnpm run version`: bare `pnpm version` is pnpm's own bump
+  and dies asking for a version argument. The script only moves the version and keeps each line's
+  shape, because `renovate.json`'s second custom manager still reads those lines.
 - **The image has a version of its own, in `image/`**: a private package that carries nothing else, so
   changesets bumps it and never publishes it (`privatePackages.version`; npm never sees it). A release
   that changes what the image bakes has to bump it in **one** of its changesets — changesets applies
-  the whole set at once, so one bump covers the release, and `tools/check-image-changesets.mts` (run
-  by `ci.yml`) refuses a release where none does. That version is the only thing that releases the
-  image: `release.yml` reads it against `github.event.before` and gates the `image` job on it. The
-  changesets action's `published`/`published-packages` are exposed for the job summary but cannot be
-  the trigger — a private package publishes nothing.
+  the whole set at once, so one bump covers the release; `tools/check-image-changesets.mts` (run by
+  `ci.yml`) enforces the same rule on the only set it can see, one pull request, which is stricter
+  than the release. That version is the only thing that releases the image: `release.yml` reads it
+  against `github.event.before` and gates the `image` job on it. The changesets action's
+  `published`/`published-packages` are exposed for the job summary but cannot be the trigger — a
+  private package publishes nothing.
 - **The image job publishes `Dockerfile`'s final stage** — not `:base`, which is a stage — to
   `ghcr.io/devockr/idsh` and `docker.io/devockr/idsh` as `:latest`, `:sha-<commit>` and `:<version>`.
   It is a multi-arch manifest list for `linux/amd64` and `linux/arm64`: the base pin is a manifest-list

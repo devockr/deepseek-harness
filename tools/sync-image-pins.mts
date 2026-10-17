@@ -9,14 +9,16 @@
  * bumped package manifests and the Dockerfile together, and by the time the release workflow
  * publishes, `main` already names the versions being published.
  *
- * Only versions move. `renovate.json`'s second custom manager parses these lines, so each keeps its
- * shape: `dsh plugin … add` on one line, every package still written as `@scope/name@version`. A
- * workspace package the Dockerfile does not bake is reported rather than added — whether the
- * published image ships a plugin is not this script's decision.
+ * Only versions move, through `image-pins.mts`, so each line keeps the shape `renovate.json`'s
+ * second custom manager parses: `dsh plugin … add` on one line, every package still written as
+ * `@scope/name@version`. A workspace package the Dockerfile does not bake is reported rather than
+ * added — whether the published image ships a plugin is not this script's decision.
  */
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+import { isPluginLine, rewritePins } from './image-pins.mts'
 
 const repo = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 const dockerfile = path.join(repo, 'Dockerfile')
@@ -46,9 +48,6 @@ const workspacePackages = async (): Promise<Map<string, string>> => {
   return packages
 }
 
-/** `@scope/name@version` — the one shape a pin has inside a `dsh plugin … add` line. */
-const pin = /(@[^@\s]+)@([^\s@]+)/g
-
 const versions = await workspacePackages()
 const source = await fs.readFile(dockerfile, 'utf8')
 const baked = new Set<string>()
@@ -58,17 +57,17 @@ const updated = source
   .split('\n')
   .map(line => {
     // Only the install lines are read, so a version elsewhere in the file is left alone.
-    if (!/\bdsh\s+plugin\b/.test(line)) {
+    if (!isPluginLine(line)) {
       return line
     }
-    return line.replaceAll(pin, (whole, name: string, version: string) => {
+    return rewritePins(line, ({ name, version }) => {
       const wanted = versions.get(name)
       if (!wanted) {
-        return whole
+        return
       }
       baked.add(name)
       if (wanted === version) {
-        return whole
+        return
       }
       changed.push(`${name} ${version} -> ${wanted}`)
       return `${name}@${wanted}`

@@ -6,13 +6,15 @@
  * that waits for it would not run.
  *
  * One bump is enough. `changeset version` applies every pending changeset at once, so the image only
- * has to be named somewhere in the release, not in each changeset. The pending changesets are the
- * ones in the tree — a release consumes them, so `main` has none and a pull request carries the ones
- * it adds.
+ * has to be named somewhere in the release, not in each changeset. What CI can see is one pull
+ * request's changesets — a release consumes them, so `main` has none — which makes the rule stricter
+ * than the release itself: a pull request that changes a baked package carries the bump itself.
  */
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+import { isPluginLine, pinsIn } from './image-pins.mts'
 
 const repo = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 
@@ -33,18 +35,14 @@ const image =
   (await nameOf(path.join(repo, 'image/package.json'))) ??
   fail('image/package.json has no name')
 
-/** The packages the published image bakes: the Dockerfile installs one per workspace package. */
+/** The packages the image bakes: the pins its Dockerfile installs, and nothing else. */
 const baked = new Set<string>()
-for (const entry of await fs.readdir(path.join(repo, 'packages'), {
-  withFileTypes: true,
-})) {
-  if (!entry.isDirectory()) {
+const dockerfile = await fs.readFile(path.join(repo, 'Dockerfile'), 'utf8')
+for (const line of dockerfile.split('\n')) {
+  if (!isPluginLine(line)) {
     continue
   }
-  const name = await nameOf(
-    path.join(repo, 'packages', entry.name, 'package.json'),
-  )
-  if (name) {
+  for (const { name } of pinsIn(line)) {
     baked.add(name)
   }
 }

@@ -25,9 +25,9 @@ jobs:
       contents: write
       id-token: write
       pull-requests: write
-    # `published` is what the job summary reports; `released`/`version` are the image's own version,
-    # and that is what releases the image — `image/` is private, so an image-only release publishes
-    # nothing to npm.
+    # `published`/`published-packages` are the action's npm result, reported in the job summary;
+    # `released`/`version` are the image's own version, and that is what releases the image —
+    # `image/` is private, so an image-only release publishes nothing to npm.
     outputs:
       published: ${{ steps.changesets.outputs.published }}
       published-packages: ${{ steps.changesets.outputs.published-packages }}
@@ -150,15 +150,18 @@ jobs:
             echo 'TAGS'
           } >> "$GITHUB_OUTPUT"
 
+      # `published` is the action's own switch; `published-packages` defaults to `[]`, so an
+      # image-only release would otherwise print an empty array instead of saying nothing shipped.
       - name: Record what was published
         env:
-          PUBLISHED: ${{ needs.release.outputs.published-packages }}
+          PUBLISHED: ${{ needs.release.outputs.published }}
+          PACKAGES: ${{ needs.release.outputs.published-packages }}
         run: |
           {
             echo '### What this release published'
-            if [ -n "$PUBLISHED" ]; then
+            if [ "$PUBLISHED" = 'true' ]; then
               echo '```json'
-              echo "$PUBLISHED"
+              echo "$PACKAGES"
               echo '```'
             else
               echo 'No packages — the image version moved.'
