@@ -33,8 +33,8 @@ else
   #
   # The uid is written into /etc/passwd rather than through `usermod -u`, which chowns
   # the account's home directory recursively: /home/app holds the state directory
-  # (11 GB, 139k inodes) plus whatever a deployment mounts beside it, and that walk cost
-  # six minutes on every start. Anything that actually needs fixing is fixed
+  # deployment mounts beside it, and walking all of that before the first line of output delays
+  # the boot by however long the disk takes. Anything that actually needs fixing is fixed
   # non-recursively further down.
   groupmod -o -g "$PGID" app
   # `sed -i` writes a copy and renames it, which can carry the copy's mode over: /etc/passwd
@@ -144,8 +144,8 @@ for f in /home/app/* /home/app/.[!.]*; do
 done
 
 # The state directory is a bind mount, so the loop above skips it — and this one file has to be
-# readable by the uid dsh drops to. It is named here on purpose: anything recursive would walk the
-# 11 GB of cache beside it on every start, which is the whole reason `usermod -u` is gone.
+# readable by the uid dsh drops to. It is named here on purpose: anything recursive would walk
+# everything cached beside it on every start, which is the whole reason `usermod -u` is gone.
 CRED="$HOME/.dsh/.credentials.yaml"
 if [ -f "$CRED" ]; then
   chown "$PUID:$PGID" "$CRED" 2> /dev/null || true
