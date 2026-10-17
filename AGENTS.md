@@ -179,6 +179,13 @@ Observe the running thing; do not reason from source.
 - New workspace package → `pnpm install --force`, and drop `node_modules/.pnpm/lock.yaml` plus
   `.pnpm-workspace-state-v1.json` if the importer is skipped.
 
+## Docs site
+
+- `pnpm docs:dev` / `pnpm docs:build` render `README.md` and each package's `CHANGELOG.md` as a
+  small site (`docs/`, `index.html`, `vite.config.ts`). It has no content of its own: the Markdown
+  files are the source, and `dist/` is build output and gitignored. `@vitejs/plugin-react` is used
+  rather than the SWC one because `@swc/core` needs a build script, which `allowBuilds` refuses.
+
 ## Releasing and CI
 
 - **Every action is pinned to a full commit SHA with its release tag in a trailing comment**
@@ -215,6 +222,13 @@ Observe the running thing; do not reason from source.
   digest, which is what lets one `FROM` resolve per platform, and the arm64 half runs under QEMU on an
   amd64 runner — the slow half, which is what the job's `timeout-minutes` is for.
   `node-addon-require-builtin` ships `linux-arm64-gnu` prebuilds, so dsh installs there.
+- **The release build installs from the official registry**, not the mirror the Dockerfiles default to
+  for local builds: `release.yml` passes `NPM_REGISTRY=https://registry.npmjs.org/` as a build
+  argument. A mirror is for a slow network, not for the thing that publishes.
+- **The `unknown/unknown` rows on the package page are the attestations**, not a broken build:
+  `buildx` writes provenance and the SBOM into the same manifest list as entries that carry no real
+  platform. `release.yml` keeps both on (`provenance: true`, `sbom: true`) — they are what proves
+  which commit and workflow produced a digest. Do not turn them off to tidy the page.
 - **Docker Hub needs `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`** (an access token, not the account
   password); both registry logins run before the build, so a missing one fails the job rather than
   leaving one registry a release behind the other. A change that moves neither a package nor the image

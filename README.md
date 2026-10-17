@@ -1,6 +1,32 @@
 # deepseek-harness
 
-Dockerized [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`) web UI.
+[![GitHub Actions](https://github.com/devockr/idsh/workflows/CI/badge.svg)](https://github.com/devockr/idsh/actions/workflows/ci.yml)
+[![GitHub release](https://img.shields.io/github/release/devockr/idsh)](https://github.com/devockr/idsh/releases)
+[![Docker image version](https://img.shields.io/docker/v/devockr/idsh?sort=semver)](https://hub.docker.com/r/devockr/idsh/tags)
+[![Docker image size](https://img.shields.io/docker/image-size/devockr/idsh)](https://hub.docker.com/r/devockr/idsh)
+[![Docker pulls](https://img.shields.io/docker/pulls/devockr/idsh)](https://hub.docker.com/r/devockr/idsh)
+[![GHCR](https://img.shields.io/badge/ghcr.io-devockr%2Fidsh-blue?logo=github)](https://github.com/devockr/idsh/pkgs/container/idsh)
+
+[![Conventional Commits](https://img.shields.io/badge/conventional%20commits-1.0.0-yellow.svg)](https://conventionalcommits.org)
+[![Renovate enabled](https://img.shields.io/badge/renovate-enabled-brightgreen.svg)](https://renovatebot.com)
+[![Code Style: Prettier](https://img.shields.io/badge/code_style-prettier-ff69b4.svg)](https://github.com/prettier/prettier)
+[![changesets](https://img.shields.io/badge/maintained%20with-changesets-176de3.svg)](https://github.com/changesets/changesets)
+
+> Dockerized [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`) web UI.
+
+## Packages
+
+| Package                                          | Description                                                                  | Version                                                                                                           |
+| ------------------------------------------------ | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| [`@idsh/mobile`](/packages/mobile)               | Touch CSS, Enter as a line break, and the home-screen icon                   | [![npm](https://img.shields.io/npm/v/@idsh/mobile.svg)](https://www.npmjs.com/package/@idsh/mobile)               |
+| [`@idsh/privileged-ui`](/packages/privileged-ui) | The settings page over a non-loopback origin, delegating the decision to dsh | [![npm](https://img.shields.io/npm/v/@idsh/privileged-ui.svg)](https://www.npmjs.com/package/@idsh/privileged-ui) |
+| [`@idsh/remote-access`](/packages/remote-access) | Keeps the UI's multiplexed WebSocket alive across a stalled connection       | [![npm](https://img.shields.io/npm/v/@idsh/remote-access.svg)](https://www.npmjs.com/package/@idsh/remote-access) |
+
+## Documentation
+
+This README and the package changelogs are also a small site: `pnpm docs:dev` serves it and
+`pnpm docs:build` writes a static copy to `dist/`. It renders the Markdown as-is — the same
+`README.md` and `packages/*/CHANGELOG.md` you see here — so there is nothing to keep in sync.
 
 ## Requirements
 
@@ -77,7 +103,7 @@ Environment variables (see `docker-compose.example.yml`):
 | Variable                                                | Purpose                                                                                                                                                                                                    | Default                           |
 | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
 | `PUID` / `PGID`                                         | uid/gid dsh runs as (and owns bind-mounted files as); compose forwards the host's `$UID`/`$GID`                                                                                                            | `$UID` / `$GID`                   |
-| `NPM_REGISTRY`                                          | npm/pnpm/yarn registry: the image build and the user-level configs use it                                                                                                                                  | `https://registry.npmmirror.com/` |
+| `NPM_REGISTRY`                                          | npm/pnpm/yarn registry: the image build and the user-level configs use it (the release build on GitHub Actions passes the official one)                                                                    | `https://registry.npmmirror.com/` |
 | `DSH_TRUSTED_HOSTS`                                     | Space-separated host authorities allowed by dsh's browser-trust fence                                                                                                                                      | `dsh.example.com`                 |
 | `DSH_PUBLIC_URL`                                        | Public HTTP(S) root to advertise behind a prefix-stripping proxy; pair it with `DSH_TRUSTED_HOSTS`                                                                                                         | —                                 |
 | `DSH_BIND_HOST`                                         | Concrete address dsh binds, defaulting to the container's own (the wildcard is refused): set it to `127.0.0.1` to give up remote reach, or to one address when several networks make the default ambiguous | this container                    |
@@ -119,6 +145,10 @@ repository's _permissions_, not its visibility. So flip `idsh` to public once (p
 Danger Zone — it cannot be made private again), or pull with a token. Docker Hub needs neither: a
 repository there is public by default.
 
+The package page lists `unknown/unknown` rows beside `amd64` and `arm64`: those are the build's
+provenance and SBOM attestations, written into the same manifest list with no platform of their own.
+They are what lets a digest be traced back to the commit and workflow that produced it.
+
 ## Notes
 
 - **Runs as your host user** — the container starts as root, re-points its `app`
@@ -134,3 +164,23 @@ repository there is public by default.
 - **UI probe** — `node tools/ui-probe.mts` boots a throwaway instance in an isolated `$DSH_HOME` and drives it with a real browser, so a client plugin's runtime behaviour can be checked without touching the live profile. It installs the plugin set the image baked — what a deployment gets — and `--install <pnpm-spec>` adds to or replaces that, which is how a checkout or a candidate package is probed; `--bare` starts from the shipped template alone, for narrowing down which plugin is at fault. It needs the `:dev` image — `pnpm dev` builds it from a checkout, and `docker-compose.dev.yml` carries the browser settings it reads, which needs Compose 2.24.4+ for its `!reset` tag — which is the one carrying the browser libraries; `--no-browser` skips the browser and checks the served boot graph instead.
 - **Remote exposure** — what reaches the UI is the address the entrypoint binds and the port you publish: a published port forwards to that address, and the bind also puts it into dsh's browser-trust fence. Put TLS and auth (or a VPN) in front unless that network is trusted; see [`@idsh/remote-access`](packages/remote-access/)'s README for what the package itself does.
 - **HTTPS reverse proxy** — if you front this with nginx, keep the `Host` header intact (`proxy_set_header Host $http_host;`) so the browser-trust fence passes, and add WebSocket upgrade headers.
+
+## Sponsors and Backers
+
+[![Sponsors and Backers](https://raw.githubusercontent.com/1stG/static/master/sponsors.svg)](https://github.com/sponsors/JounQin)
+
+### Sponsors
+
+| 1stG                                                                                                                   | RxTS                                                                                                                   | UnTS                                                                                                                   |
+| ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| [![1stG Open Collective sponsors](https://opencollective.com/1stG/organizations.svg)](https://opencollective.com/1stG) | [![RxTS Open Collective sponsors](https://opencollective.com/rxts/organizations.svg)](https://opencollective.com/rxts) | [![UnTS Open Collective sponsors](https://opencollective.com/unts/organizations.svg)](https://opencollective.com/unts) |
+
+### Backers
+
+| 1stG                                                                                                                | RxTS                                                                                                                | UnTS                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| [![1stG Open Collective backers](https://opencollective.com/1stG/individuals.svg)](https://opencollective.com/1stG) | [![RxTS Open Collective backers](https://opencollective.com/rxts/individuals.svg)](https://opencollective.com/rxts) | [![UnTS Open Collective backers](https://opencollective.com/unts/individuals.svg)](https://opencollective.com/unts) |
+
+## License
+
+[MIT](LICENSE) © [JounQin](https://github.com/JounQin)

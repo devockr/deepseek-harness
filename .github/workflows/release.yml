@@ -178,12 +178,20 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
+          # GitHub Actions installs from the official registry, not the mirror the
+          # Dockerfiles default to for local builds.
+          build-args: |
+            NPM_REGISTRY=https://registry.npmjs.org/
           tags: ${{ steps.tags.outputs.tags }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ needs.release.outputs.version }}
-          # The image is attested the way the packages are.
+          # The image is attested the way the packages are. Both attestations land in
+          # this tag's manifest list as extra entries with no real platform, which is
+          # why the package page shows "unknown/unknown" rows beside amd64 and arm64 —
+          # that is the attestation itself, not a broken build, and it is what verifies
+          # which commit and workflow produced a digest.
           provenance: true
           sbom: true
           cache-from: type=gha
