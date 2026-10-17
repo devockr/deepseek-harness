@@ -54,6 +54,21 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Create Release Pull Request or Publish to npm
+        id: changesets
+        uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'chore: release package(s)'
+          pr-title: 'chore: release package(s)'
+          # `pnpm release` is `changeset publish`, whose `pnpm publish` runs each package's
+          # `prepack`, so a published tarball always carries a fresh `lib/`.
+          publish-script: pnpm release
+          version-script: pnpm run version
+
+      # Only a release has an image to consider: while changesets are pending, the action above opens
+      # or refreshes the version pull request and publishes nothing, so there is no tag to look for.
+      #
       # One step, two answers: the version this release carries, and whether the registry already has
       # it. Asking the registry is what `changeset publish` does with npm — it answers "the same commit
       # was re-run", "the previous attempt failed after the version moved" and "several commits landed
@@ -61,6 +76,7 @@ jobs:
       # repository is public, and it is the registry a deployment pulls from.
       - name: Read the image version and whether it is published
         id: image-version
+        if: steps.changesets.outputs.has-changesets == 'false'
         run: |
           set -euo pipefail
           version=$(jq -r .version image/package.json)
@@ -73,18 +89,6 @@ jobs:
             echo "publish=true" >> "$GITHUB_OUTPUT"
             echo "$reference is not published yet"
           fi
-
-      - name: Create Release Pull Request or Publish to npm
-        id: changesets
-        uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: 'chore: release package(s)'
-          pr-title: 'chore: release package(s)'
-          # `pnpm release` is `changeset publish`, whose `pnpm publish` runs each package's
-          # `prepack`, so a published tarball always carries a fresh `lib/`.
-          publish-script: pnpm release
-          version-script: pnpm run version
 
   image:
     name: Publish the image
