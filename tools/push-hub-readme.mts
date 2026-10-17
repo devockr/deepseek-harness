@@ -33,6 +33,26 @@ const fail = (message: string): never => {
 }
 
 /**
+ * What the JWT the login handed back is actually allowed to do. A token with the read scope only
+ * authenticates and then gets `insufficient scope` from the PATCH, which reads like a permission
+ * problem on the namespace and is usually the token's own setting.
+ */
+const scopesOf = (jwt: string): string => {
+  const [, payload = ''] = jwt.split('.')
+  try {
+    const claims = JSON.parse(
+      Buffer.from(payload, 'base64url').toString('utf8'),
+    ) as {
+      access?: Array<{ type?: string; actions?: string[] }>
+    }
+    const actions = (claims.access ?? []).flatMap(entry => entry.actions ?? [])
+    return actions.length === 0 ? 'no scopes' : actions.join(', ')
+  } catch {
+    return 'unreadable token'
+  }
+}
+
+/**
  * One request, and the message carries the status and whatever the API said when it is not a 2xx —
  * which is the whole of what a fetch wrapper would have bought here.
  */
@@ -48,7 +68,9 @@ const call = async (
   })
   const text = await response.text()
   if (!response.ok) {
-    fail(`${init.method} ${url} answered ${String(response.status)} ${text}`)
+    throw new Error(
+      `${init.method} ${url} answered ${String(response.status)} ${text}`,
+    )
   }
   return text === '' ? undefined : JSON.parse(text)
 }
@@ -70,13 +92,26 @@ const token = process.env.DOCKERHUB_TOKEN ?? fail('DOCKERHUB_TOKEN is not set')
 const login = (await call('https://hub.docker.com/v2/users/login/', {
   method: 'POST',
   body: { username, password: token },
-})) as { token?: string } | undefined
+}).catch((error: unknown) =>
+  fail(
+    `login failed (${error instanceof Error ? error.message : String(error)}) — the account or the token is wrong`,
+  ),
+)) as { token?: string } | undefined
 const jwt = login?.token ?? fail('login answered without a token')
 
 await call(API, {
   method: 'PATCH',
   headers: { Authorization: `Bearer ${jwt}` },
   body,
+}).catch((error: unknown) => {
+  // The two failures worth naming: a token that authenticates but cannot write, and an account
+  // without write access to the namespace.
+  if (error instanceof Error && error.message.includes('insufficient scope')) {
+    fail(
+      `the token authenticated but cannot write (scopes: ${scopesOf(jwt)}) — Docker Hub access tokens are read-only unless "Read & Write" was chosen, and the account needs write access to ${NAMESPACE}`,
+    )
+  }
+  throw error
 })
 
 console.log(`push-hub-readme: ${NAMESPACE}/${REPOSITORY} updated`)
