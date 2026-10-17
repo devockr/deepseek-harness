@@ -3,5 +3,6 @@
 # is whitelisted because BuildKit reads `-f <file>` from the context when it lives inside it.
 *
 !packages/
+!tools/
 packages/*/node_modules
 !Dockerfile.dev

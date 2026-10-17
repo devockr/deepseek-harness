@@ -52,8 +52,9 @@ naming a public mirror here leaks nothing.
   is `docker-compose.example.yml` for the deployment and `docker-compose.dev.yml` for the browser
   settings, which are a state-directory path and a public mirror and hold nothing personal.
 - **Each image has its own ignore file**: `.dockerignore` for `Dockerfile` (which copies
-  `entrypoint.sh` and `tools/`), `Dockerfile.dev.dockerignore` for the dev image (`packages/`, plus the
-  Dockerfile itself, which BuildKit reads from the context). Neither build carries the other's
+  `entrypoint.sh` and the one tool the entrypoint runs, `tools/sync-companions.mts`),
+  `Dockerfile.dev.dockerignore` for the dev image (`packages/` and `tools/`, plus the Dockerfile
+  itself, which BuildKit reads from the context). Neither build carries the other's
   content, and a new `COPY` has to be whitelisted in the right one or the build fails loudly.
 - **The `@deepseek-ai/dsh@…`/`pnpm@…` pins and the plugins baked into the images** are read by the
   custom managers in `renovate.json`: the first parses the `npm install -g` RUN line to its end, the
@@ -69,8 +70,8 @@ naming a public mirror here leaks nothing.
 | `deepseek-harness-dsh:dev`    | `:base` + those libraries; the profile baked from `packages/` | local runs and browser-driven checks |
 
 Build the dev image with `pnpm dev`: it compiles the packages (`pnpm build`), then builds `:base`
-and then `:dev` — in that order, and both orders are the point. `:base` carries `tools/` and
-`entrypoint.sh`, so a `:dev` built without rebuilding it keeps the old ones, which is a stale image
+and then `:dev` — in that order, and both orders are the point. `:base` carries
+`entrypoint.sh` and `tools/sync-companions.mts`, so a `:dev` built without rebuilding it keeps the old ones, which is a stale image
 that looks fresh; and the compiled `lib/` is what dsh loads, so `Dockerfile.dev` refuses to build a package
 that has none — or whose `src/` is newer than its `lib/`, which is what a forgotten rebuild
 looks like — rather than shipping one that cannot load, or is stale. `prepack` runs the same

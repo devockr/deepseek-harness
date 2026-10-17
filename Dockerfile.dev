@@ -92,3 +92,9 @@ RUN mkdir -p /opt/dsh/home \
       dsh plugin --profile web add "link:${d%/}"; \
     done \
  && test -f /opt/dsh/home/.dsh/profiles/web/package.json
+
+# The rest of tools/, after everything above: the base stage carries only the one script the
+# entrypoint runs, so that adding a helper (a probe, a check, the deploy tool) does not invalidate
+# its npm install and the apt layer above this one. Here it costs a single COPY, and it comes last
+# so a helper change does not redo the profile baking either.
+COPY --chmod=755 tools/ /opt/dsh/tools/
