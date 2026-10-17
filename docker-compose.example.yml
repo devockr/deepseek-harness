@@ -59,7 +59,9 @@ services:
       - all_proxy
       - no_proxy
     ports:
-      - '15080:3080'
+      # Loopback only: put a reverse proxy in front, or widen this to '15080:3080' when the
+      # port itself is what you publish.
+      - '127.0.0.1:15080:3080'
     volumes:
       # Only dsh's own state: what else to mount is yours to decide.
       - ./.dsh:/home/app/.dsh
