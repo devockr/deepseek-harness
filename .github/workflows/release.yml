@@ -26,12 +26,11 @@ jobs:
       id-token: write
       pull-requests: write
     # `published`/`published-packages` are the action's npm result, reported in the job summary;
-    # `released`/`version` are the image's own version, and that is what releases the image —
-    # `image/` is private, so an image-only release publishes nothing to npm.
+    # `version` is the image's own version — `image/` is private, so an image-only release publishes
+    # nothing to npm, and whether that version needs building is the `published` job's question.
     outputs:
       published: ${{ steps.changesets.outputs.published }}
       published-packages: ${{ steps.changesets.outputs.published-packages }}
-      released: ${{ steps.image-version.outputs.released }}
       version: ${{ steps.image-version.outputs.version }}
     steps:
       - name: Checkout Repo
@@ -55,21 +54,12 @@ jobs:
 
       # The image's version is `image/package.json`, bumped by a changeset like any other release.
       # A release that only moves it publishes nothing, so `published` cannot be the only signal.
-      - name: Read the image version this push releases
+      # Whether that version is already on the registry is a different question, and the next job
+      # asks it: a diff against the previous commit cannot, because the same version may be traversed
+      # again after a failed attempt.
+      - name: Read the image version this release carries
         id: image-version
-        env:
-          BEFORE: ${{ github.event.before }}
-        run: |
-          now=$(jq -r .version image/package.json)
-          before=$(git show "$BEFORE:image/package.json" 2>/dev/null | jq -r .version || true)
-          {
-            echo "version=$now"
-            if [ -n "$before" ] && [ "$now" != "$before" ]; then
-              echo "released=true"
-            else
-              echo "released=false"
-            fi
-          } >> "$GITHUB_OUTPUT"
+        run: echo "version=$(jq -r .version image/package.json)" >> "$GITHUB_OUTPUT"
 
       - name: Create Release Pull Request or Publish to npm
         id: changesets
@@ -83,13 +73,49 @@ jobs:
           publish-script: pnpm release
           version-script: pnpm run version
 
+  published:
+    name: Is this image version already published?
+    needs: release
+    # The registry is the authority, the way `changeset publish` treats it. Asking whether this
+    # version is already there answers "the same commit was re-run", "the previous attempt failed
+    # after the version moved" and "several commits landed at once" — none of which a diff against
+    # the previous commit can.
+    if: needs.release.outputs.version != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      publish: ${{ steps.check.outputs.publish }}
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: check
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          reference="ghcr.io/${GITHUB_REPOSITORY}:${VERSION}"
+          if docker manifest inspect "$reference" > /dev/null 2>&1; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "$reference is already published"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            echo "$reference is not published yet"
+          fi
+
   image:
     name: Publish the image
-    needs: release
-    # The image is released when its own version moves, and only then — `ci.yml` makes sure every
-    # changeset that changes what the image bakes moves it. By this point the packages `Dockerfile`
-    # names are on the registry, which is what the build that installs them needs.
-    if: needs.release.outputs.released == 'true'
+    needs: [release, published]
+    # Only when the registry does not already carry this version — `ci.yml` makes sure a changeset
+    # that changes what the image bakes moves it. By this point the packages `Dockerfile` names are
+    # on the registry, which is what the build that installs them needs.
+    if: needs.published.outputs.publish == 'true'
     runs-on: ubuntu-latest
     # The arm64 half is emulated, so this is minutes of apt, npm and `dsh plugin add`; a build that
     # deadlocks under QEMU should fail rather than sit on the default six-hour budget.
