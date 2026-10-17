@@ -28,7 +28,7 @@ jobs:
     # `published`/`published-packages` are the action's npm result, reported in the job summary.
     # `version` is the image's own version, read from the tree this job already checked out: `image/`
     # is private, so an image-only release publishes nothing to npm, and whether that version needs
-    # building is the `image-tag` job's question — it needs the number, not the tree.
+    # building is the same step's answer — it needs the number, not the tree.
     outputs:
       published: ${{ steps.changesets.outputs.published }}
       published-packages: ${{ steps.changesets.outputs.published-packages }}
