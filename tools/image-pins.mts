@@ -20,11 +20,12 @@ const pin = /(@[^@\s]+)@([^\s@]+)/
 const pinMatcher = (): RegExp => new RegExp(pin.source, 'g')
 
 /**
- * A line that installs plugins from the registry, which is where a pin lives. The `add` matters: the
- * Dockerfile's comment above those lines names `dsh plugin` too, and a comment is not an install.
+ * A line that installs plugins from the registry, which is where a pin lives. Two things disqualify
+ * one: it is a comment — `#` says so, and the absence of `add` does not, since a comment can quote
+ * the whole command — or it has no `add` verb, which is what makes it an install and not a mention.
  */
 export const isPluginLine = (line: string): boolean =>
-  /\bdsh\s+plugin\b[^\n]+\badd\b/.test(line)
+  !/^\s*#/.test(line) && /\bdsh\s+plugin\b[^\n]+\badd\b/.test(line)
 
 /** The pins on one line, in the order they appear. */
 export const pinsIn = (line: string): Pin[] => {
