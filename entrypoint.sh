@@ -135,25 +135,40 @@ unset NPM_REGISTRY
 #
 # /home/app and /app themselves are always ours — a non-recursive chown cannot
 # reach into the mounts below /home/app — so they go first and unconditionally.
-chown "$PUID:$PGID" /home/app /app 2> /dev/null || true
+#
+# `-h` everywhere: a symlink named on the command line is followed, and these entries live in a
+# mounted directory where a link to /etc/shadow would be handed to PUID. `chown -R` below does not
+# follow links and needs no flag.
+chown -h "$PUID:$PGID" /home/app /app 2> /dev/null || true
 
 for f in /home/app/* /home/app/.[!.]*; do
   [ -e "$f" ] || continue
   mountpoint -q "$f" && continue
-  chown "$PUID:$PGID" "$f" 2> /dev/null || true
+  chown -h "$PUID:$PGID" "$f" 2> /dev/null || true
 done
 
 # The state directory is a bind mount, so the loop above skips it — and this one file has to be
 # readable by the uid dsh drops to. It is named here on purpose: anything recursive would walk
 # everything cached beside it on every start, which is the whole reason `usermod -u` is gone.
 #
-# Both `chown` and `chmod` follow a symlink named on the command line, so a link planted in the
-# mounted directory — to /etc/shadow, say — would hand that file to PUID and then widen it back to
-# 0600 for its new owner. Only a regular file is touched, and `-h` keeps the change on the link if
-# one appears between the test and the call.
+# `chown` and `chmod` follow a symlink named on the command line, and this path lives in a mounted
+# directory — so a link is resolved first and allowed only while it stays inside the state directory.
+# A deployment that links its credentials to another file in there keeps working; one that points at
+# /etc/shadow is named and refused, rather than being handed to PUID.
 CRED="$HOME/.dsh/.credentials.yaml"
-if [ -f "$CRED" ] && [ ! -L "$CRED" ]; then
-  chown -h "$PUID:$PGID" "$CRED" 2> /dev/null || true
+if [ -L "$CRED" ]; then
+  target=$(readlink -f "$CRED" 2> /dev/null) || target=
+  case "$target" in
+    "$HOME/.dsh/"*) ;;
+    *)
+      echo "entrypoint: $CRED resolves to ${target:-nothing}; it must stay inside $HOME/.dsh" >&2
+      exit 1
+      ;;
+  esac
+  CRED="$target"
+fi
+if [ -f "$CRED" ]; then
+  chown "$PUID:$PGID" "$CRED" 2> /dev/null || true
   chmod 600 "$CRED"
 fi
 
