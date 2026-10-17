@@ -151,21 +151,13 @@ done
 # readable by the uid dsh drops to. It is named here on purpose: anything recursive would walk
 # everything cached beside it on every start, which is the whole reason `usermod -u` is gone.
 #
-# `chown` and `chmod` follow a symlink named on the command line, and this path lives in a mounted
-# directory — so a link is resolved first and allowed only while it stays inside the state directory.
-# A deployment that links its credentials to another file in there keeps working; one that points at
-# /etc/shadow is named and refused, rather than being handed to PUID.
+# A symlink is an error rather than something to resolve: `chown` and `chmod` follow one named on the
+# command line, so a link planted in a mounted directory (to /etc/shadow, say) would be handed to PUID
+# — and a link is not a shape this file is meant to have.
 CRED="$HOME/.dsh/.credentials.yaml"
 if [ -L "$CRED" ]; then
-  target=$(readlink -f "$CRED" 2> /dev/null) || target=
-  case "$target" in
-    "$HOME/.dsh/"*) ;;
-    *)
-      echo "entrypoint: $CRED resolves to ${target:-nothing}; it must stay inside $HOME/.dsh" >&2
-      exit 1
-      ;;
-  esac
-  CRED="$target"
+  echo "entrypoint: $CRED is a symlink; it must be a regular file" >&2
+  exit 1
 fi
 if [ -f "$CRED" ]; then
   chown "$PUID:$PGID" "$CRED" 2> /dev/null || true
