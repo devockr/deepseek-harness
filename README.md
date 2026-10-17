@@ -1,4 +1,4 @@
-# deepseek-harness
+# idsh
 
 [![GitHub Actions](https://github.com/devockr/idsh/workflows/CI/badge.svg)](https://github.com/devockr/idsh/actions/workflows/ci.yml)
 [![GitHub release](https://img.shields.io/github/release/devockr/idsh)](https://github.com/devockr/idsh/releases)
