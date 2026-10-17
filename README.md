@@ -71,11 +71,15 @@ Markdown files are the source — there is nothing to keep in sync.
    #   the address when set, and then the logged URL is the one to open)
    ```
 
-4. Open it in your browser (note the host port is `15080`):
+4. Open it on the Docker host (the port is published on `15080`, on loopback):
 
    ```
-   http://<host>:15080/?token=<token>
+   http://127.0.0.1:15080/?token=<token>
    ```
+
+   It answers on the host only: the template binds the published port to `127.0.0.1`, so reach it
+   from a browser on that machine or through a reverse proxy there. Publishing it on every interface
+   is the one-line change described under Ports and volumes.
 
 The entrypoint decides what the server binds: it hands dsh this container's own address, which is
 the address a published port forwards to — a listener on `127.0.0.1` _inside_ the container cannot
