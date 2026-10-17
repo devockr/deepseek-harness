@@ -10,16 +10,26 @@ export interface Pin {
 }
 
 /** `@scope/name@version`: the only shape a pin has, and the only pattern either tool matches. */
-const pin = /(@[^@\s]+)@([^\s@]+)/g
+const pin = /(@[^@\s]+)@([^\s@]+)/
 
-/** A line that installs a plugin from the registry; a version anywhere else is not a pin. */
+/**
+ * A fresh matcher per call, from the one pattern above: `matchAll` inherits `lastIndex` from the
+ * regex it is handed, so a shared `/g` would start skipping matches the moment anything advanced it
+ * — a `pin.test(line)` somewhere else would be enough.
+ */
+const pinMatcher = (): RegExp => new RegExp(pin.source, 'g')
+
+/**
+ * A line that installs plugins from the registry, which is where a pin lives. The `add` matters: the
+ * Dockerfile's comment above those lines names `dsh plugin` too, and a comment is not an install.
+ */
 export const isPluginLine = (line: string): boolean =>
-  /\bdsh\s+plugin\b/.test(line)
+  /\bdsh\s+plugin\b[^\n]+\badd\b/.test(line)
 
 /** The pins on one line, in the order they appear. */
 export const pinsIn = (line: string): Pin[] => {
   const pins: Pin[] = []
-  for (const match of line.matchAll(pin)) {
+  for (const match of line.matchAll(pinMatcher())) {
     pins.push({ name: match[1], version: match[2] })
   }
   return pins
@@ -30,6 +40,6 @@ export const rewritePins = (
   line: string,
   pick: (pin: Pin) => string | undefined,
 ): string =>
-  line.replaceAll(pin, (whole, name: string, version: string) => {
+  line.replaceAll(pinMatcher(), (whole, name: string, version: string) => {
     return pick({ name, version }) ?? whole
   })
