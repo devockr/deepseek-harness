@@ -52,7 +52,7 @@ naming a public mirror here leaks nothing.
   is `docker-compose.example.yml` for the deployment and `docker-compose.dev.yml` for the browser
   settings, which are a state-directory path and a public mirror and hold nothing personal.
 - **Each image has its own ignore file**: `.dockerignore` for `Dockerfile` (which copies
-  `entrypoint.sh` and the one tool the entrypoint runs, `tools/image/sync-companions.mts`),
+  `entrypoint.sh` and the one tool the entrypoint runs, `tools/sync-companions.mts`),
   `Dockerfile.dev.dockerignore` for the dev image (`packages/` and `tools/dev/`, plus the Dockerfile
   itself, which BuildKit reads from the context). Neither build carries the other's
   content, and a new `COPY` has to be whitelisted in the right one or the build fails loudly.
@@ -71,7 +71,7 @@ naming a public mirror here leaks nothing.
 
 Build the dev image with `pnpm dev`: it compiles the packages (`pnpm build`), then builds `:base`
 and then `:dev` — in that order, and both orders are the point. `:base` carries
-`entrypoint.sh` and `tools/image/sync-companions.mts`, so a `:dev` built without rebuilding it keeps the old ones, which is a stale image
+`entrypoint.sh` and `tools/sync-companions.mts`, so a `:dev` built without rebuilding it keeps the old ones, which is a stale image
 that looks fresh; and the compiled `lib/` is what dsh loads, so `Dockerfile.dev` refuses to build a package
 that has none — or whose `src/` is newer than its `lib/`, which is what a forgotten rebuild
 looks like — rather than shipping one that cannot load, or is stale. `prepack` runs the same
@@ -183,12 +183,12 @@ Observe the running thing; do not reason from source.
 
 - **`tools/` itself holds what ships or what CI runs**: the release and check scripts
   (`sync-image-pins.mts`, `check-image-changesets.mts`, `check-peer-ranges.mts`,
-  `push-hub-readme.mts`), the shared `image-pins.mts` and `types.d.ts`.
+  `push-hub-readme.mts`), the shared `image-pins.mts` and `types.d.ts`, and
+  `sync-companions.mts` — the one script `entrypoint.sh` runs at boot, which the `Dockerfile`
+  copies by name so that everything else here stays out of the image.
 - **`tools/dev/` is for local development only** — `deploy-dev.ts`, `ui-probe.mts` — nothing in
-  there runs in CI or ships.
-- **`tools/image/` is baked into the image** — currently only `sync-companions.mts`, the one script
-  `entrypoint.sh` runs at boot. The `Dockerfile` copies that file alone, so adding a helper to
-  `tools/` does not invalidate its npm install layer.
+  there runs in CI or ships. A directory of its own, rather than a per-file convention, because the
+  rule is who runs it, and that is a property of the whole set.
 
 ## Docs site
 
