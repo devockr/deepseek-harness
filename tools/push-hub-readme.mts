@@ -85,13 +85,13 @@ await call(API, {
   headers: { Authorization: `Bearer ${jwt}` },
   body,
 }).catch((error: unknown) => {
-  // The token authenticates and still cannot write. Measured against two tokens for the same account:
-  // the one that could PATCH carried Read, Write *and Delete* plus "Allow Cloud Sandboxes access";
-  // the one that got this 403 carried neither extra. The JWT is opaque — it has no claims to read the
-  // permissions from — so the message can only name the difference and point at the token settings.
+  // The token authenticates and still cannot write. Measured on two tokens for the same account, both
+  // with Read and Write: the one that could PATCH also had `Delete`, the one that got this 403 did
+  // not — "Cloud Sandboxes access" turned out to be irrelevant. The JWT is opaque, so the message can
+  // only point at the one permission that differs.
   if (error instanceof Error && error.message.includes('insufficient scope')) {
     fail(
-      `the token authenticated but cannot write — Docker Hub grants repository metadata writes to access tokens with Read, Write and Delete plus "Allow Cloud Sandboxes access"`,
+      `the token authenticated but cannot write — Docker Hub needs an access token with Read, Write *and Delete* to change repository metadata`,
     )
   }
   throw error
