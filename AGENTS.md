@@ -249,7 +249,7 @@ Observe the running thing; do not reason from source.
   Delete answer 200, and "Allow Cloud Sandboxes access" makes no difference. The JWT is opaque — it
   carries neither `username` nor `access` — so the response is the only way to tell.
   Those permissions are account-wide, so a token taken out of CI can delete anything that account can
-  write. A dedicated account with access to `idsh` alone would bound that; it has not been set up.
+  write.
 - **Docker Hub needs `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`** (an access token, not the account
   password); both registry logins run before the build, so a missing one fails the job rather than
   leaving one registry a release behind the other. A change that moves neither a package nor the image
