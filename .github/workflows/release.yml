@@ -190,11 +190,16 @@ jobs:
             --data "$(jq -n --arg u "${DOCKERHUB_USERNAME}" --arg p "${DOCKERHUB_TOKEN}" \
               '{username: $u, password: $p}')" | jq -r .token)
           [ -n "$jwt" ] && [ "$jwt" != null ] || { echo "no JWT from Docker Hub" >&2; exit 1; }
+          # Both fields are repository-level: the Hub has one page per repository, shared by every
+          # tag, so there is no per-version README to maintain.
+          body=$(jq -n --arg short 'Dockerized DeepSeek Harness (dsh) web UI' \
+            --rawfile long README.md \
+            '{short_description: \$short, full_description: \$long}')
           curl --fail-with-body --silent --show-error \
             -X PATCH "https://hub.docker.com/v2/repositories/devockr/idsh/" \
             -H "Authorization: Bearer ${jwt}" \
             -H 'Content-Type: application/json' \
-            --data "$(jq -Rs '{full_description: .}' README.md)" > /dev/null
+            --data "$body" > /dev/null
           echo "README pushed to hub.docker.com/r/devockr/idsh"
 
       - name: Build and push
