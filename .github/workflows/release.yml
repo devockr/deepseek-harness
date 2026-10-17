@@ -187,6 +187,11 @@ jobs:
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ needs.release.outputs.version }}
+            org.opencontainers.image.title=deepseek-harness
+            org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.documentation=${{ github.server_url }}/${{ github.repository }}#readme
+            org.opencontainers.image.description=Dockerized DeepSeek Harness (dsh) web UI
+            org.opencontainers.image.licenses=MIT
           # The image is attested the way the packages are. Both attestations land in
           # this tag's manifest list as extra entries with no real platform, which is
           # why the package page shows "unknown/unknown" rows beside amd64 and arm64 —
@@ -197,3 +202,20 @@ jobs:
           sbom: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Docker Hub's Overview is not read from the image — the OCI labels above only fill the
+      # sidebar. It has to be pushed to the Hub's API, or the page says "README not available"
+      # however good the image is. DOCKERHUB_TOKEN is the same access token the login uses.
+      - name: Push the README to Docker Hub
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          body=$(jq -Rs '{full_description: .}' README.md)
+          curl --fail-with-body --silent --show-error \
+            -X PATCH "https://hub.docker.com/v2/repositories/${DOCKERHUB_USERNAME}/idsh/" \
+            -H "Authorization: Bearer ${DOCKERHUB_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            --data "$body" > /dev/null
+          echo "README pushed to hub.docker.com/r/${DOCKERHUB_USERNAME}/idsh"
