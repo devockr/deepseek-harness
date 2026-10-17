@@ -33,28 +33,6 @@ const fail = (message: string): never => {
 }
 
 /**
- * Which account the JWT the login handed back belongs to, and what it is allowed to do. The account
- * matters as much as the scopes: the secret in CI is not necessarily the token that was tried
- * locally, and "no scopes" says nothing about which one answered.
- */
-const claimsOf = (jwt: string): string => {
-  const [, payload = ''] = jwt.split('.')
-  try {
-    const claims = JSON.parse(
-      Buffer.from(payload, 'base64url').toString('utf8'),
-    ) as {
-      access?: Array<{ type?: string; actions?: string[] }>
-      username?: string
-    }
-    const actions = (claims.access ?? []).flatMap(entry => entry.actions ?? [])
-    const scopes = actions.length === 0 ? 'no scopes' : actions.join(', ')
-    return `user ${claims.username ?? '(unnamed)'}, scopes ${scopes}`
-  } catch {
-    return 'unreadable token'
-  }
-}
-
-/**
  * One request, and the message carries the status and whatever the API said when it is not a 2xx —
  * which is the whole of what a fetch wrapper would have bought here.
  */
@@ -109,11 +87,11 @@ await call(API, {
 }).catch((error: unknown) => {
   // The token authenticates and still cannot write. Measured against two tokens for the same account:
   // the one that could PATCH carried Read, Write *and Delete* plus "Allow Cloud Sandboxes access";
-  // the one that got this 403 carried Read and Write only. The message names the account and both
-  // permissions, because that difference is the whole difference.
+  // the one that got this 403 carried neither extra. The JWT is opaque — it has no claims to read the
+  // permissions from — so the message can only name the difference and point at the token settings.
   if (error instanceof Error && error.message.includes('insufficient scope')) {
     fail(
-      `the token authenticated but cannot write (${claimsOf(jwt)}) — Docker Hub grants metadata writes to access tokens with Read, Write and Delete plus "Allow Cloud Sandboxes access"; one without them authenticates but is refused here`,
+      `the token authenticated but cannot write — Docker Hub grants repository metadata writes to access tokens with Read, Write and Delete plus "Allow Cloud Sandboxes access"`,
     )
   }
   throw error
