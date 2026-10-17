@@ -76,11 +76,12 @@ const call = async (
 }
 
 const readme = await fs.readFile('README.md', 'utf8')
-const body = { short_description: SHORT, full_description: readme }
+// The repository object calls the sidebar line `description`; `short_description` is accepted and ignored.
+const body = { description: SHORT, full_description: readme }
 
 if (dryRun) {
   console.log(
-    `push-hub-readme: would PATCH ${NAMESPACE}/${REPOSITORY} with ${String(readme.length)} characters of README and a ${String(SHORT.length)}-character short description`,
+    `push-hub-readme: would PATCH ${NAMESPACE}/${REPOSITORY} with ${String(readme.length)} characters of README and a ${String(SHORT.length)}-character description`,
   )
   process.exit(0)
 }

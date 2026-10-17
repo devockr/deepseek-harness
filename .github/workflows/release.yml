@@ -25,14 +25,15 @@ jobs:
       contents: write
       id-token: write
       pull-requests: write
-    # `published`/`published-packages` are the action's npm result, reported in the job summary;
-    # `released`/`version` are the image's own version, and that is what releases the image —
-    # `image/` is private, so an image-only release publishes nothing to npm.
+    # `published`/`published-packages` are the action's npm result, reported in the job summary.
+    # `version` is the image's own version, read from the tree this job already checked out: `image/`
+    # is private, so an image-only release publishes nothing to npm, and whether that version needs
+    # building is the same step's answer — it needs the number, not the tree.
     outputs:
       published: ${{ steps.changesets.outputs.published }}
       published-packages: ${{ steps.changesets.outputs.published-packages }}
-      released: ${{ steps.image-version.outputs.released }}
       version: ${{ steps.image-version.outputs.version }}
+      publish: ${{ steps.image-version.outputs.publish }}
     steps:
       - name: Checkout Repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -53,24 +54,6 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
-      # The image's version is `image/package.json`, bumped by a changeset like any other release.
-      # A release that only moves it publishes nothing, so `published` cannot be the only signal.
-      - name: Read the image version this push releases
-        id: image-version
-        env:
-          BEFORE: ${{ github.event.before }}
-        run: |
-          now=$(jq -r .version image/package.json)
-          before=$(git show "$BEFORE:image/package.json" 2>/dev/null | jq -r .version || true)
-          {
-            echo "version=$now"
-            if [ -n "$before" ] && [ "$now" != "$before" ]; then
-              echo "released=true"
-            else
-              echo "released=false"
-            fi
-          } >> "$GITHUB_OUTPUT"
-
       - name: Create Release Pull Request or Publish to npm
         id: changesets
         uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
@@ -83,13 +66,49 @@ jobs:
           publish-script: pnpm release
           version-script: pnpm run version
 
+      # Only a release has an image to consider: while changesets are pending, the action above opens
+      # or refreshes the version pull request and publishes nothing, so there is no tag to look for.
+      #
+      # One step, two answers: the version this release carries, and whether the registry already has
+      # it. Asking the registry is what `changeset publish` does with npm — it answers "the same commit
+      # was re-run", "the previous attempt failed after the version moved" and "several commits landed
+      # at once", none of which a diff against the previous commit can.
+      #
+      # The tag API rather than `docker manifest inspect`, because the status is the answer: 200 means
+      # published, 404 means not, and anything else is an outage or a rate limit, which fails the step.
+      # `manifest inspect` exits non-zero for all three, so a broken registry would look like a version
+      # that needs building.
+      - name: Read the image version and whether it is published
+        id: image-version
+        if: steps.changesets.outputs.has-changesets == 'false'
+        run: |
+          set -euo pipefail
+          version=$(jq -r .version image/package.json)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          tag="https://hub.docker.com/v2/namespaces/devockr/repositories/idsh/tags/$version"
+          status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 "$tag")
+          case "$status" in
+            200)
+              echo "publish=false" >> "$GITHUB_OUTPUT"
+              echo "devockr/idsh:$version is already published"
+              ;;
+            404)
+              echo "publish=true" >> "$GITHUB_OUTPUT"
+              echo "devockr/idsh:$version is not published yet"
+              ;;
+            *)
+              echo "Docker Hub answered $status for devockr/idsh:$version" >&2
+              exit 1
+              ;;
+          esac
+
   image:
     name: Publish the image
     needs: release
-    # The image is released when its own version moves, and only then — `ci.yml` makes sure every
-    # changeset that changes what the image bakes moves it. By this point the packages `Dockerfile`
-    # names are on the registry, which is what the build that installs them needs.
-    if: needs.release.outputs.released == 'true'
+    # Only when the registry does not already carry this version — `ci.yml` makes sure a changeset
+    # that changes what the image bakes moves it. By this point the packages `Dockerfile` names are
+    # on the registry, which is what the build that installs them needs.
+    if: needs.release.outputs.publish == 'true'
     runs-on: ubuntu-latest
     # The arm64 half is emulated, so this is minutes of apt, npm and `dsh plugin add`; a build that
     # deadlocks under QEMU should fail rather than sit on the default six-hour budget.
