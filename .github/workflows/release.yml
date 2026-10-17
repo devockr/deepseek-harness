@@ -91,6 +91,9 @@ jobs:
     # names are on the registry, which is what the build that installs them needs.
     if: needs.release.outputs.released == 'true'
     runs-on: ubuntu-latest
+    # The arm64 half is emulated, so this is minutes of apt, npm and `dsh plugin add`; a build that
+    # deadlocks under QEMU should fail rather than sit on the default six-hour budget.
+    timeout-minutes: 60
     # `contents` is the top-level grant; this job adds the package it writes.
     permissions:
       contents: read
@@ -152,7 +155,7 @@ jobs:
           PUBLISHED: ${{ needs.release.outputs.published-packages }}
         run: |
           {
-            echo '### Published by this release'
+            echo '### What this release published'
             if [ -n "$PUBLISHED" ]; then
               echo '```json'
               echo "$PUBLISHED"

@@ -160,8 +160,9 @@ Observe the running thing; do not reason from source.
 - Patch YAML takes `#` comments only; `//` fails validation and the install rolls back.
 - `link:` dogfoods from source; `file:` copies.
 - An image's plugin set is the `dsh plugin add` line its Dockerfile bakes with: registry versions in
-  `Dockerfile`, `link:` copies from `packages/` in `Dockerfile.dev`. The second custom manager in
-  `renovate.json` keeps those versions current.
+  `Dockerfile`, `link:` copies from `packages/` in `Dockerfile.dev`. `pnpm version` writes the
+  `Dockerfile` versions from the manifests, and the second custom manager in `renovate.json` still
+  tracks those lines, for a version published outside this flow.
 - No `dependencies`. `@deepseek-ai/dsh-*` appear as `peerDependencies`, which says which dsh line a
   plugin is built against without pinning one into the profile: `dsh plugin --profile web add` on a
   peers-only manifest installs the plugin alone (`Packages: +1`) and only warns that the peers are
@@ -198,25 +199,24 @@ Observe the running thing; do not reason from source.
   manifests — never by hand. The script only moves the version and keeps each line's shape, because
   `renovate.json`'s second custom manager still reads those lines.
 - **The image has a version of its own, in `image/`**: a private package that carries nothing else, so
-  changesets bumps it and never publishes it (`privatePackages.version`; npm never sees it). That
-  version is what releases the image, so a release that changes what the image bakes has to bump it
-  in **one** of its changesets — changesets applies the whole set at once, so one bump covers the
-  release, and `ci.yml` refuses a release where none does.
-- **The image is released when its own version moves, and only then.** `release.yml` reads
-  `released`/`version` from `image/package.json` against `github.event.before` and gates the `image`
-  job on it; the changesets action's `published` and `published-packages` are exposed for the job
-  summary, but they cannot be the trigger — `image/` is private, so an image-only release publishes
-  nothing. `tools/check-image-changesets.mts` is what keeps a version tag and the content it names
-  from drifting apart. The job pushes `Dockerfile`'s final stage — not `:base`, which is a stage — to
-  `ghcr.io/devockr/idsh` and `docker.io/devockr/idsh` as `:latest`, `:sha-<commit>` and `:<version>`,
-  as a multi-arch manifest list for `linux/amd64` and `linux/arm64`. The base pin is a manifest-list
+  changesets bumps it and never publishes it (`privatePackages.version`; npm never sees it). A release
+  that changes what the image bakes has to bump it in **one** of its changesets — changesets applies
+  the whole set at once, so one bump covers the release, and `tools/check-image-changesets.mts` (run
+  by `ci.yml`) refuses a release where none does. That version is the only thing that releases the
+  image: `release.yml` reads it against `github.event.before` and gates the `image` job on it. The
+  changesets action's `published`/`published-packages` are exposed for the job summary but cannot be
+  the trigger — a private package publishes nothing.
+- **The image job publishes `Dockerfile`'s final stage** — not `:base`, which is a stage — to
+  `ghcr.io/devockr/idsh` and `docker.io/devockr/idsh` as `:latest`, `:sha-<commit>` and `:<version>`.
+  It is a multi-arch manifest list for `linux/amd64` and `linux/arm64`: the base pin is a manifest-list
   digest, which is what lets one `FROM` resolve per platform, and the arm64 half runs under QEMU on an
-  amd64 runner — it is the slow half, and `node-addon-require-builtin` ships `linux-arm64-gnu`
-  prebuilds, so dsh installs there. Docker Hub needs `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` (an
-  access token, not the account password), and both logins run before the build, so a missing one
-  fails the job rather than leaving one registry a release behind the other. A change that moves
-  neither a package nor the image — a Renovate pin bump, an `entrypoint.sh` fix with no changeset —
-  reaches the published image with the next release.
+  amd64 runner — the slow half, which is what the job's `timeout-minutes` is for.
+  `node-addon-require-builtin` ships `linux-arm64-gnu` prebuilds, so dsh installs there.
+- **Docker Hub needs `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`** (an access token, not the account
+  password); both registry logins run before the build, so a missing one fails the job rather than
+  leaving one registry a release behind the other. A change that moves neither a package nor the image
+  — a Renovate pin bump, an `entrypoint.sh` fix with no changeset — reaches the published image with
+  the next release.
 
 ## Pull requests
 

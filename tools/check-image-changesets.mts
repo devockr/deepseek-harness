@@ -33,7 +33,7 @@ const image =
   (await nameOf(path.join(repo, 'image/package.json'))) ??
   fail('image/package.json has no name')
 
-/** The packages the published image bakes: every workspace package under `packages/`. */
+/** The packages the published image bakes: the Dockerfile installs one per workspace package. */
 const baked = new Set<string>()
 for (const entry of await fs.readdir(path.join(repo, 'packages'), {
   withFileTypes: true,
@@ -51,7 +51,7 @@ for (const entry of await fs.readdir(path.join(repo, 'packages'), {
 
 /** The package names a changeset names, from the front matter between its `---` lines. */
 const namedIn = (source: string): string[] => {
-  const [, front = ''] = /^---\n([\s\S]*?)\n---/.exec(source) ?? []
+  const [, front = ''] = /^---\r?\n([\s\S]*?)\r?\n---/.exec(source) ?? []
   const names: string[] = []
   for (const line of front.split('\n')) {
     const match = /^"(?<name>[^"]+)": (?:major|minor|patch)$/u.exec(line.trim())
