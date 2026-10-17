@@ -107,11 +107,13 @@ await call(API, {
   headers: { Authorization: `Bearer ${jwt}` },
   body,
 }).catch((error: unknown) => {
-  // A token that authenticates but cannot write: the account it belongs to says which of the two
-  // possible causes it is — the token's own scope, or that account's role in the namespace.
+  // The token authenticates and still cannot write. Measured against two tokens for the same account:
+  // the one that could PATCH carried Read, Write *and Delete* plus "Allow Cloud Sandboxes access";
+  // the one that got this 403 carried Read and Write only. The message names the account and both
+  // permissions, because that difference is the whole difference.
   if (error instanceof Error && error.message.includes('insufficient scope')) {
     fail(
-      `the token authenticated but cannot write (${claimsOf(jwt)}) — either the token lacks the write scope, or that account has no write access to ${NAMESPACE}`,
+      `the token authenticated but cannot write (${claimsOf(jwt)}) — Docker Hub grants metadata writes to access tokens with Read, Write and Delete plus "Allow Cloud Sandboxes access"; one without them authenticates but is refused here`,
     )
   }
   throw error
