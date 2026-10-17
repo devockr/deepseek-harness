@@ -402,8 +402,8 @@ if (flag('--no-browser')) {
     html,
   )
   const graph = (boot?.[1] ?? '')
-    .replaceAll('&amp;', '&')
     .replaceAll('&quot;', '"')
+    .replaceAll('&amp;', '&')
   process.stdout.write(
     `shell       : ${res.status} ${res.headers.get('content-type') ?? ''} ${html.length} bytes\n`,
   )
