@@ -1,5 +1,5 @@
 {
-  "name": "deepseek-harness-plugins",
+  "name": "idsh",
   "type": "module",
   "description": "Companion dsh plugins for the container image in this repository",
   "license": "MIT",
@@ -21,7 +21,7 @@
     "release": "changeset publish",
     "test": "pnpm --recursive --if-present run test",
     "typecheck": "tsc -p tsconfig.json",
-    "version": "changeset version && pnpm install --lockfile-only"
+    "version": "changeset version && node tools/sync-image-pins.mts && pnpm install --lockfile-only"
   },
   "devDependencies": {
     "@1stg/eslint-config": "^10.3.2",

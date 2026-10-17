@@ -1,7 +1,8 @@
-# The image needs exactly one file from this tree (entrypoint.sh), so the
-# workspace is purely for the companion plugins under packages/ — see README.
+# The image needs exactly one file from this tree (entrypoint.sh), so the workspace is for the
+# companion plugins under packages/ plus image/, which carries the image's own version — see README.
 packages:
   - packages/*
+  - image
 allowBuilds:
   unrs-resolver: false
 minimumReleaseAgeExclude:

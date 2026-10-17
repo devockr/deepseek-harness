@@ -39,6 +39,11 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: pnpm
 
+      # The image is released from its own version, so a changeset that changes what it bakes has to
+      # move that version; without this a forgotten bump would publish packages and ship no image.
+      - name: Check the changesets bump the image
+        run: node tools/check-image-changesets.mts
+
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
