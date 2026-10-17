@@ -41,6 +41,12 @@ else
   # has to stay 0644 or every non-root lookup fails.
   sed -i "s|^app:x:[0-9]*:[0-9]*:|app:x:$PUID:$PGID:|" /etc/passwd
   chmod 0644 /etc/passwd
+  # A pattern that stopped matching would leave the image's build-time uid in place and run the
+  # whole container as the wrong user, silently — the account lookup is the cheap way to tell.
+  if [ "$(id -u app)" != "$PUID" ]; then
+    echo "entrypoint: app is still uid $(id -u app), not $PUID" >&2
+    exit 1
+  fi
 
   # `-o` can leave two accounts sharing a uid: app + node when PUID=1000, which is
   # the most common uid on Linux — so this is the *likely* case for anyone reusing

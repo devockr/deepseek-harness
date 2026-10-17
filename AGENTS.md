@@ -228,7 +228,7 @@ Observe the running thing; do not reason from source.
   Hub's tag API — 200 published, 404 not, anything else fails the step — once the changesets action
   reports `has-changesets == 'false'`. A diff against `github.event.before` cannot answer that: the
   same commit may be re-run, and a failed attempt leaves the version unchanged, which is how `0.0.3`
-  was skipped once. A private package publishes nothing, so the action's own 'published' flag
+  was skipped once. A private package publishes nothing, so the action's own `published` flag
   cannot be the image's trigger.
 - **The image job publishes `Dockerfile`'s final stage** — not `:base`, which is a stage — to
   `ghcr.io/devockr/idsh` and `docker.io/devockr/idsh` as `:latest`, `:sha-<commit>` and `:<version>`.
