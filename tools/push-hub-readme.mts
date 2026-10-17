@@ -100,23 +100,6 @@ const login = (await call('https://hub.docker.com/v2/users/login/', {
 )) as { token?: string } | undefined
 const jwt = login?.token ?? fail('login answered without a token')
 
-// Nothing to do when the Hub already carries this text: PATCH bumps last_modified and says nothing
-// new, and a release that only rebuilt the image would otherwise rewrite the page every time.
-const current = (await call(API, {
-  method: 'GET',
-  headers: { Authorization: `Bearer ${jwt}` },
-})) as { description?: string; full_description?: string } | undefined
-
-if (
-  current?.description === body.description &&
-  current.full_description === body.full_description
-) {
-  console.log(
-    `push-hub-readme: ${NAMESPACE}/${REPOSITORY} already matches this README`,
-  )
-  process.exit(0)
-}
-
 await call(API, {
   method: 'PATCH',
   headers: { Authorization: `Bearer ${jwt}` },
