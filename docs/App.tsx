@@ -72,10 +72,6 @@ export const App = () => (
         element={<Changelog />}
       />
       <Route
-        path="/README.md"
-        element={<Readme />}
-      />
-      <Route
         path="/packages/:name"
         element={<Readme />}
       />
