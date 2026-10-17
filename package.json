@@ -29,6 +29,7 @@
     "@changesets/changelog-github": "^1.0.1",
     "@changesets/cli": "^3.0.3",
     "@types/node": "^26.6.5",
+    "@types/semver": "^7.8.0",
     "@typescript/native": "npm:typescript@^7.0.2",
     "eslint": "^10.12.0",
     "playwright": "^1.64.0",
