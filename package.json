@@ -12,7 +12,7 @@
     "build": "pnpm --recursive --if-present --workspace-concurrency=1 run build",
     "deploy:dev": "pnpm dev && node tools/deploy-dev.ts",
     "deploy:dev:dry": "node tools/deploy-dev.ts --dry",
-    "dev": "pnpm build && docker build --target base -t deepseek-harness-dsh:base . && docker build -f Dockerfile.dev -t deepseek-harness-dsh:dev .",
+    "dev": "pnpm build && docker build --target base -t devockr/idsh:base . && docker build -f Dockerfile.dev -t devockr/idsh:dev .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint . --cache",

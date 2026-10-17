@@ -121,7 +121,7 @@ const resolved = JSON.parse(
   await compose(['config', '--format', 'json']),
 ) as Resolved
 const service = resolved.services?.dsh ?? {}
-const image = service.image ?? 'deepseek-harness-dsh:dev'
+const image = service.image ?? 'devockr/idsh:dev'
 console.log(`deploy:dev: image ${image}`)
 
 // 2) Pre-flight: create a throwaway container with exactly the mounts the config declares. A bind
