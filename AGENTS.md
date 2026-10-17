@@ -186,8 +186,7 @@ Observe the running thing; do not reason from source.
   `image-pins.mts` and `types.d.ts`, and
   `sync-companions.mts` — the one script `entrypoint.sh` runs at boot, which the `Dockerfile`
   copies by name so that everything else here stays out of the image.
-- **`tools/dev/` is for local development only** — `deploy-dev.ts`, `ui-probe.mts`,
-  `push-hub-readme.mts` — nothing in
+- **`tools/dev/` is for local development only** — `deploy-dev.ts`, `ui-probe.mts` — nothing in
   there runs in CI or ships. A directory of its own, rather than a per-file convention, because the
   rule is who runs it, and that is a property of the whole set.
 
@@ -249,9 +248,9 @@ Observe the running thing; do not reason from source.
   REST API, and that API grants repository metadata writes to tokens carrying Read, Write _and_
   Delete — measured: Read and Write alone answer 403 `insufficient scope`, and "Allow Cloud
   Sandboxes access" makes no difference. Those permissions are account-wide and a token that can
-  delete repositories has no business in CI, so nothing here automates the page.
-  `tools/dev/push-hub-readme.mts` pushes `README.md` with a personal token when someone asks it to,
-  and the OCI labels keep the sidebar correct without any credential.
+  delete repositories has no business in CI, so nothing here automates the page: it is a short,
+  Hub-specific text pasted into the settings page, not `README.md`. The OCI labels keep the sidebar
+  correct without any credential.
 - **Docker Hub needs `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`** (an access token, not the account
   password); both registry logins run before the build, so a missing one fails the job rather than
   leaving one registry a release behind the other. A change that moves neither a package nor the image
