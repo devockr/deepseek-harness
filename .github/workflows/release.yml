@@ -207,17 +207,23 @@ jobs:
       # sidebar. It has to be pushed to the Hub's API, or the page says "README not available"
       # however good the image is.
       #
-      # The namespace is the image's, `devockr`, not DOCKERHUB_USERNAME: that is the account the
-      # token belongs to, and it may well be a personal one with write access to the devockr org.
+      # Two different identifiers: DOCKERHUB_USERNAME is the account whose token this is, and the
+      # repository lives in the devockr namespace. The PATCH authenticates with the short-lived JWT
+      # the login endpoint hands back, not with the token itself.
       - name: Push the README to Docker Hub
         env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
           set -euo pipefail
-          body=$(jq -Rs '{full_description: .}' README.md)
+          jwt=$(curl -sS --fail-with-body -X POST https://hub.docker.com/v2/users/login/ \
+            -H 'Content-Type: application/json' \
+            --data "$(jq -n --arg u "${DOCKERHUB_USERNAME}" --arg p "${DOCKERHUB_TOKEN}" \
+              '{username: $u, password: $p}')" | jq -r .token)
+          [ -n "$jwt" ] && [ "$jwt" != null ] || { echo "no JWT from Docker Hub" >&2; exit 1; }
           curl --fail-with-body --silent --show-error \
             -X PATCH "https://hub.docker.com/v2/repositories/devockr/idsh/" \
-            -H "Authorization: Bearer ${DOCKERHUB_TOKEN}" \
+            -H "Authorization: Bearer ${jwt}" \
             -H 'Content-Type: application/json' \
-            --data "$body" > /dev/null
+            --data "$(jq -Rs '{full_description: .}' README.md)" > /dev/null
           echo "README pushed to hub.docker.com/r/devockr/idsh"
