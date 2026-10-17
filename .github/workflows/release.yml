@@ -174,33 +174,17 @@ jobs:
       # so it is the slow half of the build.
       # Docker Hub's Overview is not read from the image — the OCI labels above only fill the
       # sidebar. It has to be pushed to the Hub's API, or the page says "README not available"
-      # however good the image is.
+      # however good the image is. That is one page per repository, shared by every tag.
       #
-      # Two different identifiers: DOCKERHUB_USERNAME is the account whose token this is, and the
-      # repository lives in the devockr namespace. The PATCH authenticates with the short-lived JWT
-      # the login endpoint hands back, not with the token itself.
+      # The script is in tools/ rather than here: shell quoting around JSON and a JWT is the kind of
+      # thing that is only ever tested in production. It authenticates, and nothing about the README
+      # depends on the image, so it runs before the build — a wrong token fails in seconds instead of
+      # after a twenty-minute multi-arch build that has already pushed its tags.
       - name: Push the README to Docker Hub
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          jwt=$(curl -sS --fail-with-body -X POST https://hub.docker.com/v2/users/login/ \
-            -H 'Content-Type: application/json' \
-            --data "$(jq -n --arg u "${DOCKERHUB_USERNAME}" --arg p "${DOCKERHUB_TOKEN}" \
-              '{username: $u, password: $p}')" | jq -r .token)
-          [ -n "$jwt" ] && [ "$jwt" != null ] || { echo "no JWT from Docker Hub" >&2; exit 1; }
-          # Both fields are repository-level: the Hub has one page per repository, shared by every
-          # tag, so there is no per-version README to maintain.
-          body=$(jq -n --arg short 'Dockerized DeepSeek Harness (dsh) web UI' \
-            --rawfile long README.md \
-            '{short_description: \$short, full_description: \$long}')
-          curl --fail-with-body --silent --show-error \
-            -X PATCH "https://hub.docker.com/v2/repositories/devockr/idsh/" \
-            -H "Authorization: Bearer ${jwt}" \
-            -H 'Content-Type: application/json' \
-            --data "$body" > /dev/null
-          echo "README pushed to hub.docker.com/r/devockr/idsh"
+        run: node tools/push-hub-readme.mts
 
       - name: Build and push
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
