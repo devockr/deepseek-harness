@@ -25,8 +25,9 @@ jobs:
       contents: write
       id-token: write
       pull-requests: write
-    # What the image job waits on: changesets' own npm result, and the image's version, which a
-    # release can move without publishing anything — `image/` is private.
+    # `published` is what the job summary reports; `released`/`version` are the image's own version,
+    # and that is what releases the image — `image/` is private, so an image-only release publishes
+    # nothing to npm.
     outputs:
       published: ${{ steps.changesets.outputs.published }}
       published-packages: ${{ steps.changesets.outputs.published-packages }}
@@ -85,10 +86,10 @@ jobs:
   image:
     name: Publish the image
     needs: release
-    # Changesets decides this, through its own results: the release either published packages or moved
-    # the image's version. Either way `Dockerfile` names versions that are now on the registry, which
-    # is what the build that installs them needs.
-    if: needs.release.outputs.published == 'true' || needs.release.outputs.released == 'true'
+    # The image is released when its own version moves, and only then — `ci.yml` makes sure every
+    # changeset that changes what the image bakes moves it. By this point the packages `Dockerfile`
+    # names are on the registry, which is what the build that installs them needs.
+    if: needs.release.outputs.released == 'true'
     runs-on: ubuntu-latest
     # `contents` is the top-level grant; this job adds the package it writes.
     permissions:
@@ -126,21 +127,18 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # `latest` and the commit always; the version only when this release moved it, so a version tag
-      # is never rewritten by a release that did not. Both registries carry the same set.
+      # Both registries carry the same three tags. The job only runs when the version moved, so the
+      # version tag always names the build it is attached to.
       - name: Work out the tags
         id: tags
         env:
           VERSION: ${{ needs.release.outputs.version }}
-          RELEASED: ${{ needs.release.outputs.released }}
         run: |
           {
             for image in ghcr.io/devockr/idsh docker.io/devockr/idsh; do
               echo "$image:latest"
               echo "$image:sha-${GITHUB_SHA}"
-              if [ "$RELEASED" = 'true' ]; then
-                echo "$image:${VERSION}"
-              fi
+              echo "$image:${VERSION}"
             done
           } > "$RUNNER_TEMP/tags"
           {

@@ -198,23 +198,24 @@ Observe the running thing; do not reason from source.
   manifests — never by hand. The script only moves the version and keeps each line's shape, because
   `renovate.json`'s second custom manager still reads those lines.
 - **The image has a version of its own, in `image/`**: a private package that carries nothing else, so
-  changesets bumps it and never publishes it (`privatePackages.version`; npm never sees it), and
-  `release.yml` tags the image with it. A changeset whose change reaches the image should name
-  `@idsh/image` alongside the packages, or the image is rebuilt under its previous version.
-- **The image is published from the action's own results.** `release.yml` exposes the changesets
-  action's `published` and `published-packages`, and reads `released`/`version` from
-  `image/package.json` against `github.event.before` — an image-only release publishes nothing, so
-  `published` alone cannot trigger it. The `image` job pushes `Dockerfile`'s final stage — not
-  `:base`, which is a stage — to `ghcr.io/devockr/idsh` and `docker.io/devockr/idsh`, as `:latest`,
-  `:sha-<commit>` and, when the version moved, `:<version>`, as a multi-arch manifest list for
-  `linux/amd64` and `linux/arm64`. The base pin is a manifest-list digest, which is what lets one
-  `FROM` resolve per platform, and the arm64 half runs under QEMU on an amd64 runner — it is the slow
-  half, and `node-addon-require-builtin` ships `linux-arm64-gnu` prebuilds, so dsh installs there.
-  Docker Hub needs `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` (an access token, not the account
-  password), and both logins run before the build, so a missing one fails the job rather than leaving
-  one registry a release behind the other. A change that neither publishes a package nor moves the
-  version does not rebuild the published image: an `entrypoint.sh` fix reaches it with the next
-  release.
+  changesets bumps it and never publishes it (`privatePackages.version`; npm never sees it). That
+  version is what releases the image, so a changeset whose change reaches the image has to name
+  `@idsh/image` alongside the packages — `ci.yml` refuses one that does not.
+- **The image is released when its own version moves, and only then.** `release.yml` reads
+  `released`/`version` from `image/package.json` against `github.event.before` and gates the `image`
+  job on it; the changesets action's `published` and `published-packages` are exposed for the job
+  summary, but they cannot be the trigger — `image/` is private, so an image-only release publishes
+  nothing. `tools/check-image-changesets.mts` is what keeps a version tag and the content it names
+  from drifting apart. The job pushes `Dockerfile`'s final stage — not `:base`, which is a stage — to
+  `ghcr.io/devockr/idsh` and `docker.io/devockr/idsh` as `:latest`, `:sha-<commit>` and `:<version>`,
+  as a multi-arch manifest list for `linux/amd64` and `linux/arm64`. The base pin is a manifest-list
+  digest, which is what lets one `FROM` resolve per platform, and the arm64 half runs under QEMU on an
+  amd64 runner — it is the slow half, and `node-addon-require-builtin` ships `linux-arm64-gnu`
+  prebuilds, so dsh installs there. Docker Hub needs `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` (an
+  access token, not the account password), and both logins run before the build, so a missing one
+  fails the job rather than leaving one registry a release behind the other. A change that moves
+  neither a package nor the image — a Renovate pin bump, an `entrypoint.sh` fix with no changeset —
+  reaches the published image with the next release.
 
 ## Pull requests
 
