@@ -205,17 +205,19 @@ jobs:
 
       # Docker Hub's Overview is not read from the image — the OCI labels above only fill the
       # sidebar. It has to be pushed to the Hub's API, or the page says "README not available"
-      # however good the image is. DOCKERHUB_TOKEN is the same access token the login uses.
+      # however good the image is.
+      #
+      # The namespace is the image's, `devockr`, not DOCKERHUB_USERNAME: that is the account the
+      # token belongs to, and it may well be a personal one with write access to the devockr org.
       - name: Push the README to Docker Hub
         env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
           set -euo pipefail
           body=$(jq -Rs '{full_description: .}' README.md)
           curl --fail-with-body --silent --show-error \
-            -X PATCH "https://hub.docker.com/v2/repositories/${DOCKERHUB_USERNAME}/idsh/" \
+            -X PATCH "https://hub.docker.com/v2/repositories/devockr/idsh/" \
             -H "Authorization: Bearer ${DOCKERHUB_TOKEN}" \
             -H 'Content-Type: application/json' \
             --data "$body" > /dev/null
-          echo "README pushed to hub.docker.com/r/${DOCKERHUB_USERNAME}/idsh"
+          echo "README pushed to hub.docker.com/r/devockr/idsh"
