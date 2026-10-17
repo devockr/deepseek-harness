@@ -76,11 +76,12 @@ const call = async (
 }
 
 const readme = await fs.readFile('README.md', 'utf8')
-const body = { short_description: SHORT, full_description: readme }
+// The repository object calls the sidebar line `description`; `short_description` is accepted and ignored.
+const body = { description: SHORT, full_description: readme }
 
 if (dryRun) {
   console.log(
-    `push-hub-readme: would PATCH ${NAMESPACE}/${REPOSITORY} with ${String(readme.length)} characters of README and a ${String(SHORT.length)}-character short description`,
+    `push-hub-readme: would PATCH ${NAMESPACE}/${REPOSITORY} with ${String(readme.length)} characters of README and a ${String(SHORT.length)}-character description`,
   )
   process.exit(0)
 }
@@ -98,6 +99,23 @@ const login = (await call('https://hub.docker.com/v2/users/login/', {
   ),
 )) as { token?: string } | undefined
 const jwt = login?.token ?? fail('login answered without a token')
+
+// Nothing to do when the Hub already carries this text: PATCH bumps last_modified and says nothing
+// new, and a release that only rebuilt the image would otherwise rewrite the page every time.
+const current = (await call(API, {
+  method: 'GET',
+  headers: { Authorization: `Bearer ${jwt}` },
+})) as { description?: string; full_description?: string } | undefined
+
+if (
+  current?.description === body.description &&
+  current.full_description === body.full_description
+) {
+  console.log(
+    `push-hub-readme: ${NAMESPACE}/${REPOSITORY} already matches this README`,
+  )
+  process.exit(0)
+}
 
 await call(API, {
   method: 'PATCH',

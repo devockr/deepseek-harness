@@ -73,7 +73,7 @@ jobs:
           publish-script: pnpm release
           version-script: pnpm run version
 
-  published:
+  image-tag:
     name: Is this image version already published?
     needs: release
     # The registry is the authority, the way `changeset publish` treats it. Asking whether this
@@ -111,11 +111,11 @@ jobs:
 
   image:
     name: Publish the image
-    needs: [release, published]
+    needs: [release, image-tag]
     # Only when the registry does not already carry this version — `ci.yml` makes sure a changeset
     # that changes what the image bakes moves it. By this point the packages `Dockerfile` names are
     # on the registry, which is what the build that installs them needs.
-    if: needs.published.outputs.publish == 'true'
+    if: needs.image-tag.outputs.publish == 'true'
     runs-on: ubuntu-latest
     # The arm64 half is emulated, so this is minutes of apt, npm and `dsh plugin add`; a build that
     # deadlocks under QEMU should fail rather than sit on the default six-hour budget.
